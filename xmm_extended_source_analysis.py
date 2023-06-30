@@ -199,6 +199,11 @@ class MyArray1D:
             if self.xaxis[idx_x]<=value_x and self.xaxis[idx_x+1]>value_x:
                 key_idx_x = idx_x
         return self.yaxis[key_idx_x]
+    def normalize(self):
+        reference = self.yaxis[0]
+        for entry in range(0,len(self.yaxis)):
+            self.yaxis[entry] = self.yaxis[entry]/reference
+            self.yerr[entry] = self.yerr[entry]/reference
     def calc_significance(self, src_array, bkg_array):
         for idx_x in range(0,len(self.xaxis)):
             src = src_array.yaxis[idx_x]
@@ -274,6 +279,14 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
         #    if evt_pi>1900: continue
         #if evt_pi>1200 and evt_pi<1900: continue
         #if evt_pi<1900: continue
+
+        if 'source' in evt_filter:
+            if abs(evt_detx)>2000: continue
+            if abs(evt_dety)>2000: continue
+        if 'ring' in evt_filter:
+            if abs(evt_detx)<2000 and abs(evt_dety)<2000: continue
+            if abs(evt_detx)>6000: continue
+            if abs(evt_dety)>6000: continue
 
         if not mask_lc==None:
             zscore = mask_lc.get_bin_content((evt_time-time_start)/(time_end-time_start))
@@ -417,7 +430,15 @@ off_obsID = 'ID0827241101' # Percentage of flaring time: 15.2%
 #off_sample = on_sample
 #off_obsID = on_obsID
 
+xray_sample = 'extragalactic'
+xray_obsID = 'ID0827251001'
+
 plot_tag = detector+'_'+on_obsID
+
+xray_sci_fov_evt_filename = '../%s/%s/analysis/%s-fov-evt.fits'%(xray_sample,xray_obsID,detector)
+xray_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-fov-evt.fits'%(xray_sample,xray_obsID,detector)
+xray_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(xray_sample,xray_obsID,detector)
+xray_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(xray_sample,xray_obsID,detector)
 
 off_sci_fov_evt_filename = '../%s/%s/analysis/%s-fov-evt.fits'%(off_sample,off_obsID,detector)
 off_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-fov-evt.fits'%(off_sample,off_obsID,detector)
@@ -428,6 +449,85 @@ on_sci_fov_evt_filename = '../%s/%s/analysis/%s-fov-evt.fits'%(on_sample,on_obsI
 on_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-fov-evt.fits'%(on_sample,on_obsID,detector)
 on_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(on_sample,on_obsID,detector)
 on_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(on_sample,on_obsID,detector)
+
+
+
+print ('prepare xray sample time cuts')
+
+output_all_fov = read_event_file(xray_sci_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=[energy_lower,energy_upper])
+output_all_cor = read_event_file(xray_sci_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=[energy_lower,energy_upper])
+
+xray_duration_all_fov = output_all_fov[0]
+xray_evt_count_all_fov = output_all_fov[1]
+xray_lightcurve_all_fov = output_all_fov[2]
+xray_pattern_all_fov = output_all_fov[3]
+xray_spectrum_all_fov = output_all_fov[4]
+xray_detx_all_fov = output_all_fov[5]
+xray_image_all_fov = output_all_fov[6]
+
+xray_duration_all_cor = output_all_cor[0]
+xray_evt_count_all_cor = output_all_cor[1]
+xray_lightcurve_all_cor = output_all_cor[2]
+xray_pattern_all_cor = output_all_cor[3]
+xray_spectrum_all_cor = output_all_cor[4]
+xray_detx_all_cor = output_all_cor[5]
+xray_image_all_cor = output_all_cor[6]
+
+area_pix_frac_all_fov = xray_image_all_fov[0].get_pixel_fraction()
+area_pix_frac_all_cor = xray_image_all_cor[0].get_pixel_fraction()
+
+time_pix_frac_all_fov = xray_lightcurve_all_fov[0].get_pixel_fraction()
+time_expo_all_fov = xray_duration_all_fov*time_pix_frac_all_fov
+
+time_pix_frac_all_cor = xray_lightcurve_all_cor[0].get_pixel_fraction()
+time_expo_all_cor = xray_duration_all_cor*time_pix_frac_all_cor
+
+for ebin in range(0,len(energy_bins)):
+    xray_lightcurve_all_cor[ebin].scale(area_pix_frac_all_fov/area_pix_frac_all_cor)
+
+mask_lc = make_timecut_mask(xray_lightcurve_all_fov[0],xray_lightcurve_all_cor[0]) 
+
+
+print ('apply x-ray sample space and time masks')
+
+output_sci_source = read_event_file(xray_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto source',energy_range=[energy_lower,energy_upper])
+output_sci_ring = read_event_file(xray_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto ring',energy_range=[energy_lower,energy_upper])
+
+xray_duration_sci_source = output_sci_source[0]
+xray_evt_count_sci_source = output_sci_source[1]
+xray_lightcurve_sci_source = output_sci_source[2]
+xray_pattern_sci_source = output_sci_source[3]
+xray_spectrum_sci_source = output_sci_source[4]
+xray_detx_sci_source = output_sci_source[5]
+xray_image_sci_source = output_sci_source[6]
+
+xray_duration_sci_ring = output_sci_ring[0]
+xray_evt_count_sci_ring = output_sci_ring[1]
+xray_lightcurve_sci_ring = output_sci_ring[2]
+xray_pattern_sci_ring = output_sci_ring[3]
+xray_spectrum_sci_ring = output_sci_ring[4]
+xray_detx_sci_ring = output_sci_ring[5]
+xray_image_sci_ring = output_sci_ring[6]
+
+area_pix_frac_sci_source = xray_image_sci_source[0].get_pixel_fraction()
+area_pix_frac_sci_ring = xray_image_sci_ring[0].get_pixel_fraction()
+
+for ebin in range(0,len(energy_bins)):
+    xray_pattern_sci_ring[ebin].scale(area_pix_frac_sci_source/area_pix_frac_sci_ring)
+
+xray_pattern_template = []
+for ebin in range(0,len(energy_bins)):
+    xray_pattern_template += [MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)]
+    xray_pattern_template[ebin].add(xray_pattern_sci_source[ebin])
+    xray_pattern_template[ebin].add(xray_pattern_sci_ring[ebin],factor=-1.)
+
+xray_pattern_template[0].reset()
+for ebin in range(1,len(energy_bins)):
+    xray_pattern_template[0].add(xray_pattern_template[ebin])
+for ebin in range(1,len(energy_bins)):
+    xray_pattern_template[ebin].reset()
+    xray_pattern_template[ebin].add(xray_pattern_template[0])
+
 
 print ('prepare off sample time cuts')
 
@@ -491,7 +591,7 @@ for ebin in range(0,len(energy_bins)):
 mask_lc = make_timecut_mask(off_lightcurve_all_fov[0],off_lightcurve_all_cor[0]) 
 
 
-print ('apply space and time masks')
+print ('apply off sample space and time masks')
 
 output_sci_fov = read_event_file(off_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=[energy_lower,energy_upper])
 output_sci_cor = read_event_file(off_sci_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=[energy_lower,energy_upper])
@@ -876,20 +976,16 @@ axbig.remove()
 
 print ('predict SP background')
 
-xray_pattern_template = []
 qpb_pattern_template = []
 qpb_spectrum_template = []
 qpb_detx_template = []
 for ebin in range(0,len(energy_bins)):
-    xray_pattern_template += [MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)]
-    xray_pattern_template[ebin].add(on_pattern_sci_cor[ebin])
     qpb_pattern_template += [MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)]
     qpb_pattern_template[ebin].add(on_pattern_sci_cor[ebin])
     qpb_spectrum_template += [MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)]
     qpb_spectrum_template[ebin].add(on_spectrum_sci_cor[ebin])
     qpb_detx_template += [MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)]
     qpb_detx_template[ebin].add(on_detx_fwc_fov[ebin])
-
 
 on_spectrum_sci_fov_bkg = [] 
 on_detx_sci_fov_bkg = []
@@ -936,9 +1032,9 @@ for ebin in range(0,len(energy_bins)):
     fig.clf()
     axbig = fig.add_subplot()
     axbig.errorbar(on_pattern_sci_fov[ebin].xaxis,on_pattern_sci_fov[ebin].yaxis,yerr=on_pattern_sci_fov[ebin].yerr,color='k',label='Data')
-    axbig.errorbar(xray_pattern_template[ebin].xaxis,xray_pattern_template[ebin].yaxis,yerr=xray_pattern_template[ebin].yerr,label='X-ray')
-    axbig.errorbar(qpb_pattern_template[ebin].xaxis,qpb_pattern_template[ebin].yaxis,yerr=qpb_pattern_template[ebin].yerr,label='QPB')
-    axbig.bar(sp_pattern_template[ebin].xaxis,sp_pattern_template[ebin].yaxis,label='SP Flare')
+    axbig.errorbar(xray_pattern_template[ebin].xaxis,xray_pattern_template[ebin].yaxis,yerr=xray_pattern_template[ebin].yerr,color='g',label='X-ray')
+    axbig.errorbar(qpb_pattern_template[ebin].xaxis,qpb_pattern_template[ebin].yaxis,yerr=qpb_pattern_template[ebin].yerr,color='b',label='QPB')
+    axbig.bar(sp_pattern_template[ebin].xaxis,sp_pattern_template[ebin].yaxis,color='orange',label='SP Flare')
     axbig.set_yscale('log')
     axbig.set_xlabel('PATTERN')
     axbig.legend(loc='best')
@@ -971,6 +1067,22 @@ axbig.legend(loc='best')
 fig.savefig("../output_plots/spectrum_on_fit_%s.png"%(plot_tag),bbox_inches='tight')
 axbig.remove()
 
+
+for ebin in range(0,len(energy_bins)):
+    xray_pattern_template[ebin].normalize()
+    qpb_pattern_template[ebin].normalize()
+    sp_pattern_template[ebin].normalize()
+
+fig.clf()
+axbig = fig.add_subplot()
+axbig.plot(xray_pattern_template[0].xaxis,xray_pattern_template[0].yaxis,label='X-ray')
+axbig.plot(qpb_pattern_template[0].xaxis,qpb_pattern_template[0].yaxis,label='QPB')
+axbig.plot(sp_pattern_template[0].xaxis,sp_pattern_template[0].yaxis,label='SP')
+axbig.set_yscale('log')
+axbig.set_xlabel('Pattern')
+axbig.legend(loc='best')
+fig.savefig("../output_plots/pattern_template_%s.png"%(plot_tag),bbox_inches='tight')
+axbig.remove()
 
 
 
