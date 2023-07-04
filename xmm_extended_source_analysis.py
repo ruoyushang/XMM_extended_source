@@ -15,6 +15,7 @@ from astropy.table import Table
 import numpy as np
 from operator import itemgetter, attrgetter
 from scipy.optimize import curve_fit
+from scipy.optimize import least_squares
 import time
 
 fig, ax = plt.subplots()
@@ -359,50 +360,49 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
 
 def fit_pattern(data_pattern,xray_pattern,spf_pattern,qpb_pattern):
 
-    ## Define the function to minimize (residuals)
-    #def residuals(A):
-    #    return (data_pattern.yaxis - A[0]*xray_pattern.yaxis - A[1]*spf_pattern.yaxis - qpb_pattern.yaxis) / data_pattern.error  # Include the weighted residuals
+    # Define the function to minimize (residuals)
+    def residuals(A):
+        return (data_pattern.yaxis - A[0]*xray_pattern.yaxis - A[1]*spf_pattern.yaxis - qpb_pattern.yaxis) / data_pattern.yerr  # Include the weighted residuals
 
-    #data_pattern.get_error()
-    ## Perform the least squares fitting
-    #result = least_squares(residuals, x0=[0.1,0.1], bounds=([0.,0.], [1.0,1.0]))  # x0 is the initial guess for A
+    data_pattern.get_error()
+    # Perform the least squares fitting
+    result = least_squares(residuals, x0=[0.1,0.1], bounds=([0.,0.], [1.0,1.0]))  # x0 is the initial guess for A
 
-    #xray_pattern.scale(result.x[0])
-    #spf_pattern.scale(result.x[1])
+    xray_scale = result.x[0]
+    sp_scale = result.x[1]
 
+    #sp_free_data = 0.
+    #sp_free_xray = 0.
+    #sp_free_qpb = 0.
+    #for idx in range(0,len(data_pattern.xaxis)):
+    #    if idx!=2: continue
+    #    if idx>4: continue
+    #    sp_free_data += data_pattern.yaxis[idx]
+    #    sp_free_xray += xray_pattern.yaxis[idx]
+    #    sp_free_qpb  += qpb_pattern.yaxis[idx]
 
-    sp_free_data = 0.
-    sp_free_xray = 0.
-    sp_free_qpb = 0.
-    for idx in range(0,len(data_pattern.xaxis)):
-        if idx!=2: continue
-        if idx>4: continue
-        sp_free_data += data_pattern.yaxis[idx]
-        sp_free_xray += xray_pattern.yaxis[idx]
-        sp_free_qpb  += qpb_pattern.yaxis[idx]
+    #xray_scale = 0.
+    #if sp_free_xray>0.:
+    #    xray_scale = (sp_free_data-sp_free_qpb)/sp_free_xray
+    #xray_scale = max(0.,xray_scale)
 
-    xray_scale = 0.
-    if sp_free_xray>0.:
-        xray_scale = (sp_free_data-sp_free_qpb)/sp_free_xray
-    xray_scale = max(0.,xray_scale)
-
-    sp_pattern_data = 0.
-    sp_pattern_xray = 0.
-    sp_pattern_qpb = 0.
-    sp_pattern_spf = 0.
-    for idx in range(0,len(data_pattern.xaxis)):
-        if idx==2: continue
-        if idx>4: continue
-        sp_pattern_data += data_pattern.yaxis[idx]
-        sp_pattern_xray += xray_pattern.yaxis[idx]
-        sp_pattern_qpb  += qpb_pattern.yaxis[idx]
-        sp_pattern_spf  += spf_pattern.yaxis[idx]
-    sp_pattern_xray = sp_pattern_xray*xray_scale
-    
-    sp_scale = 0.
-    if sp_pattern_spf>0.:
-        sp_scale = (sp_pattern_data-sp_pattern_xray-sp_pattern_qpb)/sp_pattern_spf
-    sp_scale = max(0.,sp_scale)
+    #sp_pattern_data = 0.
+    #sp_pattern_xray = 0.
+    #sp_pattern_qpb = 0.
+    #sp_pattern_spf = 0.
+    #for idx in range(0,len(data_pattern.xaxis)):
+    #    if idx==2: continue
+    #    if idx>4: continue
+    #    sp_pattern_data += data_pattern.yaxis[idx]
+    #    sp_pattern_xray += xray_pattern.yaxis[idx]
+    #    sp_pattern_qpb  += qpb_pattern.yaxis[idx]
+    #    sp_pattern_spf  += spf_pattern.yaxis[idx]
+    #sp_pattern_xray = sp_pattern_xray*xray_scale
+    #
+    #sp_scale = 0.
+    #if sp_pattern_spf>0.:
+    #    sp_scale = (sp_pattern_data-sp_pattern_xray-sp_pattern_qpb)/sp_pattern_spf
+    #sp_scale = max(0.,sp_scale)
 
     return sp_scale, xray_scale
     
@@ -1199,7 +1199,7 @@ axbig.errorbar(on_detx_sci_fov[0].xaxis,on_detx_sci_fov[0].yaxis,yerr=on_detx_sc
 axbig.plot(on_detx_sci_fov_bkg[0].xaxis,on_detx_sci_fov_bkg[0].yaxis,color='red',label='Bkg')
 axbig.plot(sp_detx_template[0].xaxis,sp_detx_template[0].yaxis,label='SP')
 axbig.plot(qpb_detx_template[0].xaxis,qpb_detx_template[0].yaxis,label='QPB')
-axbig.set_yscale('log')
+#axbig.set_yscale('log')
 axbig.set_xlabel('DETX')
 axbig.legend(loc='best')
 fig.savefig("../output_plots/detx_on_fit_%s.png"%(plot_tag),bbox_inches='tight')
