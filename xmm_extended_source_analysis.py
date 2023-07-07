@@ -24,15 +24,15 @@ figsize_y = 6.
 fig.set_figheight(figsize_y)
 fig.set_figwidth(figsize_x)
 
-energy_lower = 1000
-energy_upper = 12000
+energy_lower = 2000
+energy_upper = 3000
 
-science_energy_lower = 2000
-science_energy_upper = 12000
+science_energy_lower = energy_lower
+science_energy_upper = energy_upper
 
 all_ccd_bins = [1,2,3,4,5,6,7]
 ana_ccd_bins = [1,2,3,4,5,6,7]
-xray_ccd_bins = [1]
+xray_ccd_bins = [1,2,3,4,5,6,7]
 
 ch_low = 200
 ch_high = 12000
@@ -279,6 +279,7 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
 
         #if evt_pattern<=0:continue
         #if evt_pattern>12:continue
+        if evt_pattern>4:continue
 
         #if 'Al' in evt_filter:
         #    if evt_pi<1200: continue
@@ -287,12 +288,17 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
         #if evt_pi<1900: continue
 
         if 'source' in evt_filter:
-            if abs(evt_detx)>2000: continue
-            if abs(evt_dety)>2000: continue
-        if 'ring' in evt_filter:
-            if abs(evt_detx)<2000 and abs(evt_dety)<2000: continue
+            #if abs(evt_detx)>1000: continue
+            #if abs(evt_dety)>1000: continue
             if abs(evt_detx)>6000: continue
             if abs(evt_dety)>6000: continue
+        if 'ring' in evt_filter:
+            #if abs(evt_detx)<1500 and abs(evt_dety)<1500: continue
+            #if abs(evt_detx)>6000: continue
+            #if abs(evt_dety)>6000: continue
+            if abs(evt_detx)<6000 and abs(evt_dety)<6000: continue
+            if abs(evt_detx)>12000: continue
+            if abs(evt_dety)>12000: continue
 
         if not mask_lc==None:
             zscore = mask_lc.get_bin_content((evt_time-time_start)/(time_end-time_start))
@@ -360,49 +366,52 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
 
 def fit_pattern(data_pattern,xray_pattern,spf_pattern,qpb_pattern):
 
+    sp_free_data = 0.
+    sp_free_xray = 0.
+    sp_free_qpb = 0.
+    for idx in range(0,len(data_pattern.xaxis)):
+        if idx!=2: continue
+        if idx>4: continue
+        sp_free_data += data_pattern.yaxis[idx]
+        sp_free_xray += xray_pattern.yaxis[idx]
+        sp_free_qpb  += qpb_pattern.yaxis[idx]
+
+    xray_scale = 0.
+    if sp_free_xray>0.:
+        xray_scale = (sp_free_data-sp_free_qpb)/sp_free_xray
+    xray_scale = max(0.,xray_scale)
+
+    sp_pattern_data = 0.
+    sp_pattern_xray = 0.
+    sp_pattern_qpb = 0.
+    sp_pattern_spf = 0.
+    for idx in range(0,len(data_pattern.xaxis)):
+        if idx==2: continue
+        if idx>4: continue
+        sp_pattern_data += data_pattern.yaxis[idx]
+        sp_pattern_xray += xray_pattern.yaxis[idx]
+        sp_pattern_qpb  += qpb_pattern.yaxis[idx]
+        sp_pattern_spf  += spf_pattern.yaxis[idx]
+    sp_pattern_xray = sp_pattern_xray*xray_scale
+    
+    sp_scale = 0.
+    if sp_pattern_spf>0.:
+        sp_scale = (sp_pattern_data-sp_pattern_xray-sp_pattern_qpb)/sp_pattern_spf
+    sp_scale = max(0.,sp_scale)
+
+
     # Define the function to minimize (residuals)
     def residuals(A):
         return (data_pattern.yaxis - A[0]*xray_pattern.yaxis - A[1]*spf_pattern.yaxis - qpb_pattern.yaxis) / data_pattern.yerr  # Include the weighted residuals
+        #return (data_pattern.yaxis - A[0]*xray_pattern.yaxis - A[1]*spf_pattern.yaxis - qpb_pattern.yaxis)  # Include the weighted residuals
 
     data_pattern.get_error()
     # Perform the least squares fitting
-    result = least_squares(residuals, x0=[0.1,0.1], bounds=([0.,0.], [1.0,1.0]))  # x0 is the initial guess for A
+    result = least_squares(residuals, x0=[xray_scale,sp_scale], bounds=([0.5*xray_scale,0.5*sp_scale], [2.*(xray_scale+1e-4),2.*(sp_scale+1e-4)]))  # x0 is the initial guess for A
 
     xray_scale = result.x[0]
     sp_scale = result.x[1]
 
-    #sp_free_data = 0.
-    #sp_free_xray = 0.
-    #sp_free_qpb = 0.
-    #for idx in range(0,len(data_pattern.xaxis)):
-    #    if idx!=2: continue
-    #    if idx>4: continue
-    #    sp_free_data += data_pattern.yaxis[idx]
-    #    sp_free_xray += xray_pattern.yaxis[idx]
-    #    sp_free_qpb  += qpb_pattern.yaxis[idx]
-
-    #xray_scale = 0.
-    #if sp_free_xray>0.:
-    #    xray_scale = (sp_free_data-sp_free_qpb)/sp_free_xray
-    #xray_scale = max(0.,xray_scale)
-
-    #sp_pattern_data = 0.
-    #sp_pattern_xray = 0.
-    #sp_pattern_qpb = 0.
-    #sp_pattern_spf = 0.
-    #for idx in range(0,len(data_pattern.xaxis)):
-    #    if idx==2: continue
-    #    if idx>4: continue
-    #    sp_pattern_data += data_pattern.yaxis[idx]
-    #    sp_pattern_xray += xray_pattern.yaxis[idx]
-    #    sp_pattern_qpb  += qpb_pattern.yaxis[idx]
-    #    sp_pattern_spf  += spf_pattern.yaxis[idx]
-    #sp_pattern_xray = sp_pattern_xray*xray_scale
-    #
-    #sp_scale = 0.
-    #if sp_pattern_spf>0.:
-    #    sp_scale = (sp_pattern_data-sp_pattern_xray-sp_pattern_qpb)/sp_pattern_spf
-    #sp_scale = max(0.,sp_scale)
 
     return sp_scale, xray_scale
     
@@ -467,8 +476,11 @@ off_obsID = 'ID0827241101' # Percentage of flaring time: 15.2%
 #off_sample = on_sample
 #off_obsID = on_obsID
 
-xray_sample = 'extragalactic'
-xray_obsID = 'ID0827251001'
+#xray_sample = 'extragalactic'
+#xray_obsID = 'ID0690900101'
+#xray_obsID = 'ID0827251001'
+xray_sample = 'Cas_A'
+xray_obsID = 'ID0412180101'
 
 plot_tag = detector+'_'+on_obsID
 
@@ -525,6 +537,9 @@ for ebin in range(0,len(all_ccd_bins)+1):
 
 mask_lc = make_timecut_mask(xray_lightcurve_all_fov[0],xray_lightcurve_all_cor[0]) 
 
+time_pix_frac_mask = mask_lc.get_pixel_fraction()
+if time_pix_frac_mask>0.8:
+    mask_lc = None
 
 print ('apply x-ray sample space and time masks')
 
@@ -547,9 +562,12 @@ xray_spectrum_sci_ring = output_sci_ring[4]
 xray_detx_sci_ring = output_sci_ring[5]
 xray_image_sci_ring = output_sci_ring[6]
 
+area_pix_frac_sci_source = 0.
+area_pix_frac_sci_ring = 0.
 for ebin in range(0,len(xray_ccd_bins)+1):
-    area_pix_frac_sci_source = xray_image_sci_source[ebin].get_pixel_fraction()
-    area_pix_frac_sci_ring = xray_image_sci_ring[ebin].get_pixel_fraction()
+    area_pix_frac_sci_source += xray_image_sci_source[ebin].get_pixel_fraction()
+    area_pix_frac_sci_ring += xray_image_sci_ring[ebin].get_pixel_fraction()
+for ebin in range(0,len(xray_ccd_bins)+1):
     xray_pattern_sci_ring[ebin].scale(area_pix_frac_sci_source/area_pix_frac_sci_ring)
 
 xray_pattern_template = []
@@ -1199,7 +1217,8 @@ axbig.errorbar(on_detx_sci_fov[0].xaxis,on_detx_sci_fov[0].yaxis,yerr=on_detx_sc
 axbig.plot(on_detx_sci_fov_bkg[0].xaxis,on_detx_sci_fov_bkg[0].yaxis,color='red',label='Bkg')
 axbig.plot(sp_detx_template[0].xaxis,sp_detx_template[0].yaxis,label='SP')
 axbig.plot(qpb_detx_template[0].xaxis,qpb_detx_template[0].yaxis,label='QPB')
-#axbig.set_yscale('log')
+axbig.set_yscale('log')
+axbig.set_ylim(bottom=1)
 axbig.set_xlabel('DETX')
 axbig.legend(loc='best')
 fig.savefig("../output_plots/detx_on_fit_%s.png"%(plot_tag),bbox_inches='tight')
