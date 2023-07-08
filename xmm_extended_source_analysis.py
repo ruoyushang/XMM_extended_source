@@ -26,9 +26,7 @@ fig.set_figwidth(figsize_x)
 
 energy_array = [2000,3000,5000,8000,12000]
 
-all_ccd_bins = [1,2,3,4,5,6,7]
 ana_ccd_bins = [1,2,3,4,5,6,7]
-xray_ccd_bins = [1,2,3,4,5,6,7]
 
 ch_low = 200
 ch_high = 12000
@@ -219,7 +217,7 @@ class MyArray1D:
             else:
                 self.yaxis[idx_x] = -z_score
 
-def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=[200,12000],ccd=all_ccd_bins):
+def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=[200,12000],ccd_id=0):
 
     # how to read events:
     # https://docs.astropy.org/en/stable/generated/examples/io/fits-tables.html#accessing-data-stored-as-a-table-in-a-multi-extension-fits-mef-file
@@ -234,33 +232,12 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
     #print('events.columns:')
     #print(events.columns)
 
-    evt_count = []
-    lightcurve_array = []
-    pattern_array = []
-    spectrum_array = []
-    detx_array = []
-    image_array = []
-
-    for ebin in range(0,len(energy_range)-1):
-        evt_count_dE = []
-        lightcurve_array_dE = []
-        pattern_array_dE = []
-        spectrum_array_dE = []
-        detx_array_dE = []
-        image_array_dE = []
-        for ccdid in range(0,len(ccd)):
-            evt_count_dE += [0]
-            lightcurve_array_dE += [MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)]
-            pattern_array_dE += [MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)]
-            spectrum_array_dE += [MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)]
-            detx_array_dE += [MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)]
-            image_array_dE += [MyArray2D()]
-        evt_count += [evt_count_dE]
-        lightcurve_array += [lightcurve_array_dE]
-        pattern_array += [pattern_array_dE]
-        spectrum_array += [spectrum_array_dE]
-        detx_array += [detx_array_dE]
-        image_array += [image_array_dE]
+    evt_count = 0.
+    lightcurve_array = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
+    pattern_array = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
+    spectrum_array = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+    detx_array = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+    image_array = MyArray2D()
 
     time_start = events[0]['TIME']
     time_end = events[len(events)-1]['TIME']
@@ -272,14 +249,8 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
         evt_detx = events[evt]['DETX']
         evt_dety = events[evt]['DETY']
 
-        #if abs(evt_detx)>20000: continue
-        #if abs(evt_dety)>20000: continue
-        #if abs(evt_dety)>7000: continue
-        #if evt_detx<7000: continue
-        #if evt_detx>-7000: continue
-
         if evt_pi<energy_range[0]: continue
-        if evt_pi>energy_range[len(energy_range)-1]: continue
+        if evt_pi>energy_range[1]: continue
 
         # if 'sp-free' in evt_filter:
         #if evt_pattern==0:continue
@@ -320,49 +291,31 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
             if zscore>=2.0: continue
             if zscore<=-1.0: continue
 
-        evt_ebin = 0
-        for ebin in range(0,len(energy_range)-1):
-            if evt_pi>=energy_range[ebin] and evt_pi<energy_range[ebin+1]:
-                evt_ebin = ebin
-
-        ccd_id = 0
+        evt_ccd_id = 0
         if evt_detx<7000 and evt_detx>=-7000 and evt_dety<7000 and evt_dety>=-7000:
-            ccd_id = 1
+            evt_ccd_id = 1
         if evt_detx>=7000 and evt_dety<7000 and evt_dety>=-7000:
-            ccd_id = 3
+            evt_ccd_id = 3
         if evt_detx<-7000 and evt_dety<7000 and evt_dety>=-7000:
-            ccd_id = 6
+            evt_ccd_id = 6
         if evt_detx>=0 and evt_dety>=7000:
-            ccd_id = 4
+            evt_ccd_id = 4
         if evt_detx<0 and evt_dety>=7000:
-            ccd_id = 5
+            evt_ccd_id = 5
         if evt_detx>=0 and evt_dety<-7000:
-            ccd_id = 2
+            evt_ccd_id = 2
         if evt_detx<0 and evt_dety<-7000:
-            ccd_id = 7
+            evt_ccd_id = 7
 
-        evt_ccdid = -1
-        for ccd_bin in range(0,len(ccd)):
-            if ccd_id==ccd[ccd_bin]:
-                evt_ccdid = ccd_bin
-        if not 'cor-evt' in filename:
-            if evt_ccdid==-1: continue
+        if not 'cor-evt' in filename and not ccd_id==0:
+            if evt_ccd_id!=ccd_id: continue
 
-        if not 'cor-evt' in filename:
-            evt_count[evt_ebin][evt_ccdid] += 1.
-            lightcurve_array[evt_ebin][evt_ccdid].fill((evt_time-time_start)/(time_end-time_start))
-            pattern_array[evt_ebin][evt_ccdid].fill(evt_pattern)
-            spectrum_array[evt_ebin][evt_ccdid].fill(evt_pi)
-            detx_array[evt_ebin][evt_ccdid].fill(evt_detx)
-            image_array[evt_ebin][evt_ccdid].fill(evt_detx,evt_dety)
-        else:
-            for ccd_bin in range(0,len(ccd)):
-                evt_count[evt_ebin][ccd_bin] += 1.
-                lightcurve_array[evt_ebin][ccd_bin].fill((evt_time-time_start)/(time_end-time_start))
-                pattern_array[evt_ebin][ccd_bin].fill(evt_pattern)
-                spectrum_array[evt_ebin][ccd_bin].fill(evt_pi)
-                detx_array[evt_ebin][ccd_bin].fill(evt_detx)
-                image_array[evt_ebin][ccd_bin].fill(evt_detx,evt_dety)
+        evt_count += 1.
+        lightcurve_array.fill((evt_time-time_start)/(time_end-time_start))
+        pattern_array.fill(evt_pattern)
+        spectrum_array.fill(evt_pi)
+        detx_array.fill(evt_detx)
+        image_array.fill(evt_detx,evt_dety)
 
     return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array]
 
@@ -502,942 +455,658 @@ on_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(on_sample,on_obsI
 on_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(on_sample,on_obsID,detector)
 
 
+def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
-print ('prepare xray sample time cuts')
-
-output_all_fov = read_event_file(xray_sci_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-output_all_cor = read_event_file(xray_sci_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-
-xray_duration_all_fov = output_all_fov[0]
-xray_evt_count_all_fov = output_all_fov[1]
-xray_lightcurve_all_fov = output_all_fov[2]
-xray_pattern_all_fov = output_all_fov[3]
-xray_spectrum_all_fov = output_all_fov[4]
-xray_detx_all_fov = output_all_fov[5]
-xray_image_all_fov = output_all_fov[6]
-
-xray_duration_all_cor = output_all_cor[0]
-xray_evt_count_all_cor = output_all_cor[1]
-xray_lightcurve_all_cor = output_all_cor[2]
-xray_pattern_all_cor = output_all_cor[3]
-xray_spectrum_all_cor = output_all_cor[4]
-xray_detx_all_cor = output_all_cor[5]
-xray_image_all_cor = output_all_cor[6]
-
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
+    print ('prepare xray sample time cuts')
     
-        area_pix_frac_all_fov = xray_image_all_fov[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_all_cor = xray_image_all_cor[ebin][ccdid].get_pixel_fraction()
-        
-        time_pix_frac_all_fov = xray_lightcurve_all_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_all_fov = xray_duration_all_fov*time_pix_frac_all_fov
-        
-        time_pix_frac_all_cor = xray_lightcurve_all_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_all_cor = xray_duration_all_cor*time_pix_frac_all_cor
+    output_all_fov = read_event_file(xray_sci_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=0)
+    output_all_cor = read_event_file(xray_sci_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=0)
+
+    xray_duration_all_fov = output_all_fov[0]
+    xray_evt_count_all_fov = output_all_fov[1]
+    xray_lightcurve_all_fov = output_all_fov[2]
+    xray_pattern_all_fov = output_all_fov[3]
+    xray_spectrum_all_fov = output_all_fov[4]
+    xray_detx_all_fov = output_all_fov[5]
+    xray_image_all_fov = output_all_fov[6]
     
-        xray_lightcurve_all_cor[ebin][ccdid].scale(area_pix_frac_all_fov/area_pix_frac_all_cor)
+    xray_duration_all_cor = output_all_cor[0]
+    xray_evt_count_all_cor = output_all_cor[1]
+    xray_lightcurve_all_cor = output_all_cor[2]
+    xray_pattern_all_cor = output_all_cor[3]
+    xray_spectrum_all_cor = output_all_cor[4]
+    xray_detx_all_cor = output_all_cor[5]
+    xray_image_all_cor = output_all_cor[6]
 
-xray_lightcurve_all_fov_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-xray_lightcurve_all_cor_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        xray_lightcurve_all_fov_sum.add(xray_lightcurve_all_fov[ebin][ccdid])
-        xray_lightcurve_all_cor_sum.add(xray_lightcurve_all_cor[ebin][ccdid])
-
-mask_lc = make_timecut_mask(xray_lightcurve_all_fov_sum,xray_lightcurve_all_cor_sum) 
-
-time_pix_frac_mask = mask_lc.get_pixel_fraction()
-if time_pix_frac_mask>0.8:
-    mask_lc = None
-
-print ('apply x-ray sample space and time masks')
-
-output_sci_source = read_event_file(xray_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto source',energy_range=energy_array,ccd=xray_ccd_bins)
-output_sci_ring = read_event_file(xray_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto ring',energy_range=energy_array,ccd=xray_ccd_bins)
-
-xray_duration_sci_source = output_sci_source[0]
-xray_evt_count_sci_source = output_sci_source[1]
-xray_lightcurve_sci_source = output_sci_source[2]
-xray_pattern_sci_source = output_sci_source[3]
-xray_spectrum_sci_source = output_sci_source[4]
-xray_detx_sci_source = output_sci_source[5]
-xray_image_sci_source = output_sci_source[6]
-
-xray_duration_sci_ring = output_sci_ring[0]
-xray_evt_count_sci_ring = output_sci_ring[1]
-xray_lightcurve_sci_ring = output_sci_ring[2]
-xray_pattern_sci_ring = output_sci_ring[3]
-xray_spectrum_sci_ring = output_sci_ring[4]
-xray_detx_sci_ring = output_sci_ring[5]
-xray_image_sci_ring = output_sci_ring[6]
-
-for ebin in range(0,len(energy_array)-1):
-    area_pix_frac_sci_source = 0.
-    area_pix_frac_sci_ring = 0.
-    for ccdid in range(0,len(xray_ccd_bins)):
-        area_pix_frac_sci_source += xray_image_sci_source[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_sci_ring += xray_image_sci_ring[ebin][ccdid].get_pixel_fraction()
-    for ccdid in range(0,len(xray_ccd_bins)):
-        xray_pattern_sci_ring[ebin][ccdid].scale(area_pix_frac_sci_source/area_pix_frac_sci_ring)
-
-xray_pattern_template = []
-for ebin in range(0,len(energy_array)-1):
-    xray_pattern_template_dE = []
-    for ccdid in range(0,len(ana_ccd_bins)):
-        xray_pattern_template_dE += [MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)]
-    xray_pattern_template += [xray_pattern_template_dE]
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(ana_ccd_bins)):
-        xray_pattern_template[0][0].add(xray_pattern_sci_source[ebin][ccdid])
-        xray_pattern_template[0][0].add(xray_pattern_sci_ring[ebin][ccdid],factor=-1.)
-
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(ana_ccd_bins)):
-        if ebin==0 and ccdid==0: continue
-        xray_pattern_template[ebin][ccdid].add(xray_pattern_template[0][0])
-
-
-print ('prepare off sample time cuts')
-
-output_all_fov = read_event_file(off_sci_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-output_all_cor = read_event_file(off_sci_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-
-off_duration_all_fov = output_all_fov[0]
-off_evt_count_all_fov = output_all_fov[1]
-off_lightcurve_all_fov = output_all_fov[2]
-off_pattern_all_fov = output_all_fov[3]
-off_spectrum_all_fov = output_all_fov[4]
-off_detx_all_fov = output_all_fov[5]
-off_image_all_fov = output_all_fov[6]
-
-off_duration_all_cor = output_all_cor[0]
-off_evt_count_all_cor = output_all_cor[1]
-off_lightcurve_all_cor = output_all_cor[2]
-off_pattern_all_cor = output_all_cor[3]
-off_spectrum_all_cor = output_all_cor[4]
-off_detx_all_cor = output_all_cor[5]
-off_image_all_cor = output_all_cor[6]
-
-off_duration_fwc_fov = output_fwc_fov[0]
-off_evt_count_fwc_fov = output_fwc_fov[1]
-off_lightcurve_fwc_fov = output_fwc_fov[2]
-off_pattern_fwc_fov = output_fwc_fov[3]
-off_spectrum_fwc_fov = output_fwc_fov[4]
-off_detx_fwc_fov = output_fwc_fov[5]
-off_image_fwc_fov = output_fwc_fov[6]
-
-off_duration_fwc_cor = output_fwc_cor[0]
-off_evt_count_fwc_cor = output_fwc_cor[1]
-off_lightcurve_fwc_cor = output_fwc_cor[2]
-off_pattern_fwc_cor = output_fwc_cor[3]
-off_spectrum_fwc_cor = output_fwc_cor[4]
-off_detx_fwc_cor = output_fwc_cor[5]
-off_image_fwc_cor = output_fwc_cor[6]
-
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
+    area_pix_frac_all_fov = xray_image_all_fov.get_pixel_fraction()
+    area_pix_frac_all_cor = xray_image_all_cor.get_pixel_fraction()
     
-        area_pix_frac_all_fov = off_image_all_fov[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_all_cor = off_image_all_cor[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_fwc_fov = off_image_fwc_fov[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_fwc_cor = off_image_fwc_cor[ebin][ccdid].get_pixel_fraction()
-        
-        time_pix_frac_all_fov = off_lightcurve_all_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_all_fov = off_duration_all_fov*time_pix_frac_all_fov
-        time_pix_frac_fwc_fov = off_lightcurve_fwc_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_fov = off_duration_fwc_fov*time_pix_frac_fwc_fov
-        
-        time_pix_frac_all_cor = off_lightcurve_all_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_all_cor = off_duration_all_cor*time_pix_frac_all_cor
-        time_pix_frac_fwc_cor = off_lightcurve_fwc_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_cor = off_duration_fwc_cor*time_pix_frac_fwc_cor
+    time_pix_frac_all_fov = xray_lightcurve_all_fov.get_pixel_fraction()
+    time_expo_all_fov = xray_duration_all_fov*time_pix_frac_all_fov
     
-        off_lightcurve_all_cor[ebin][ccdid].scale(area_pix_frac_all_fov/area_pix_frac_all_cor)
-        off_lightcurve_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*time_expo_all_fov/time_expo_fwc_fov)
-
-off_lightcurve_all_fov_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-off_lightcurve_all_cor_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        off_lightcurve_all_fov_sum.add(off_lightcurve_all_fov[ebin][ccdid])
-        off_lightcurve_all_cor_sum.add(off_lightcurve_all_cor[ebin][ccdid])
-
-mask_lc = make_timecut_mask(off_lightcurve_all_fov_sum,off_lightcurve_all_cor_sum) 
-
-
-print ('apply off sample space and time masks')
-
-output_sci_fov = read_event_file(off_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_array)
-output_sci_cor = read_event_file(off_sci_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_array)
-
-off_duration_sci_fov = output_sci_fov[0]
-off_evt_count_sci_fov = output_sci_fov[1]
-off_lightcurve_sci_fov = output_sci_fov[2]
-off_pattern_sci_fov = output_sci_fov[3]
-off_spectrum_sci_fov = output_sci_fov[4]
-off_detx_sci_fov = output_sci_fov[5]
-off_image_sci_fov = output_sci_fov[6]
-
-off_duration_sci_cor = output_sci_cor[0]
-off_evt_count_sci_cor = output_sci_cor[1]
-off_lightcurve_sci_cor = output_sci_cor[2]
-off_pattern_sci_cor = output_sci_cor[3]
-off_spectrum_sci_cor = output_sci_cor[4]
-off_detx_sci_cor = output_sci_cor[5]
-off_image_sci_cor = output_sci_cor[6]
-
-output_spf_fov = read_event_file(off_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_array)
-output_spf_cor = read_event_file(off_sci_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_array)
-
-off_duration_spf_fov = output_spf_fov[0]
-off_evt_count_spf_fov = output_spf_fov[1]
-off_lightcurve_spf_fov = output_spf_fov[2]
-off_pattern_spf_fov = output_spf_fov[3]
-off_spectrum_spf_fov = output_spf_fov[4]
-off_detx_spf_fov = output_spf_fov[5]
-off_image_spf_fov = output_spf_fov[6]
-
-off_duration_spf_cor = output_spf_cor[0]
-off_evt_count_spf_cor = output_spf_cor[1]
-off_lightcurve_spf_cor = output_spf_cor[2]
-off_pattern_spf_cor = output_spf_cor[3]
-off_spectrum_spf_cor = output_spf_cor[4]
-off_detx_spf_cor = output_spf_cor[5]
-off_image_spf_cor = output_spf_cor[6]
-
-output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_array)
-output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_array)
-
-off_duration_fwc_fov = output_fwc_fov[0]
-off_evt_count_fwc_fov = output_fwc_fov[1]
-off_lightcurve_fwc_fov = output_fwc_fov[2]
-off_pattern_fwc_fov = output_fwc_fov[3]
-off_spectrum_fwc_fov = output_fwc_fov[4]
-off_detx_fwc_fov = output_fwc_fov[5]
-off_image_fwc_fov = output_fwc_fov[6]
-
-off_duration_fwc_cor = output_fwc_cor[0]
-off_evt_count_fwc_cor = output_fwc_cor[1]
-off_lightcurve_fwc_cor = output_fwc_cor[2]
-off_pattern_fwc_cor = output_fwc_cor[3]
-off_spectrum_fwc_cor = output_fwc_cor[4]
-off_detx_fwc_cor = output_fwc_cor[5]
-off_image_fwc_cor = output_fwc_cor[6]
-
-off_image_sci_fov_sum = MyArray2D()
-off_image_sci_cor_sum = MyArray2D()
-off_image_spf_fov_sum = MyArray2D()
-off_image_spf_cor_sum = MyArray2D()
-off_image_fwc_fov_sum = MyArray2D()
-off_image_fwc_cor_sum = MyArray2D()
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        off_image_sci_fov_sum.add(off_image_sci_fov[ebin][ccdid])
-        off_image_sci_cor_sum.add(off_image_sci_cor[ebin][ccdid])
-        off_image_spf_fov_sum.add(off_image_spf_fov[ebin][ccdid])
-        off_image_spf_cor_sum.add(off_image_spf_cor[ebin][ccdid])
-        off_image_fwc_fov_sum.add(off_image_fwc_fov[ebin][ccdid])
-        off_image_fwc_cor_sum.add(off_image_fwc_cor[ebin][ccdid])
-
-area_pix_frac_sci_fov = off_image_sci_fov_sum.get_pixel_fraction()
-area_pix_frac_sci_cor = off_image_sci_cor_sum.get_pixel_fraction()
-area_pix_frac_spf_fov = off_image_spf_fov_sum.get_pixel_fraction()
-area_pix_frac_spf_cor = off_image_spf_cor_sum.get_pixel_fraction()
-area_pix_frac_fwc_fov = off_image_fwc_fov_sum.get_pixel_fraction()
-area_pix_frac_fwc_cor = off_image_fwc_cor_sum.get_pixel_fraction()
-
-
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
+    time_pix_frac_all_cor = xray_lightcurve_all_cor.get_pixel_fraction()
+    time_expo_all_cor = xray_duration_all_cor*time_pix_frac_all_cor
     
-        time_pix_frac_sci_fov = off_lightcurve_sci_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_sci_fov = off_duration_sci_fov*time_pix_frac_sci_fov
-        time_pix_frac_sci_cor = off_lightcurve_sci_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_sci_cor = off_duration_sci_cor*time_pix_frac_sci_cor
-        
-        time_pix_frac_spf_fov = off_lightcurve_spf_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_spf_fov = off_duration_spf_fov*time_pix_frac_spf_fov
-        time_pix_frac_spf_cor = off_lightcurve_spf_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_spf_cor = off_duration_spf_cor*time_pix_frac_spf_cor
-        
-        time_pix_frac_fwc_fov = off_lightcurve_fwc_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_fov = off_duration_fwc_fov*time_pix_frac_fwc_fov
-        time_pix_frac_fwc_cor = off_lightcurve_fwc_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_cor = off_duration_fwc_cor*time_pix_frac_fwc_cor
-    
-        off_lightcurve_sci_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
-        off_lightcurve_spf_fov[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_spf_fov*time_expo_sci_fov/time_expo_spf_fov)
-        off_lightcurve_spf_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_spf_cor*time_expo_sci_fov/time_expo_spf_cor)
-        off_lightcurve_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
-        off_lightcurve_fwc_cor[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
-    
-        off_spectrum_sci_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
-        off_spectrum_spf_fov[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_spf_fov*time_expo_sci_fov/time_expo_spf_fov)
-        off_spectrum_spf_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_spf_cor*time_expo_sci_fov/time_expo_spf_cor)
-        off_spectrum_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
-        off_spectrum_fwc_cor[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
-        
-        off_pattern_sci_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
-        off_pattern_spf_fov[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_spf_fov*time_expo_sci_fov/time_expo_spf_fov)
-        off_pattern_spf_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_spf_cor*time_expo_sci_fov/time_expo_spf_cor)
-        off_pattern_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
-        off_pattern_fwc_cor[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
+    xray_lightcurve_all_cor.scale(area_pix_frac_all_fov/area_pix_frac_all_cor)
 
-off_lightcurve_sci_fov_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-off_lightcurve_sci_cor_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        off_lightcurve_sci_fov_sum.add(off_lightcurve_sci_fov[ebin][ccdid])
-        off_lightcurve_sci_cor_sum.add(off_lightcurve_sci_cor[ebin][ccdid])
+    mask_lc = make_timecut_mask(xray_lightcurve_all_fov,xray_lightcurve_all_cor) 
+
+    time_pix_frac_mask = mask_lc.get_pixel_fraction()
+    if time_pix_frac_mask>0.8:
+        mask_lc = None
+
+    print ('apply x-ray sample space and time masks')
+    
+    output_sci_source = read_event_file(xray_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto source',energy_range=energy_range,ccd_id=0)
+    output_sci_ring = read_event_file(xray_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto ring',energy_range=energy_range,ccd_id=0)
+    
+    xray_duration_sci_source = output_sci_source[0]
+    xray_evt_count_sci_source = output_sci_source[1]
+    xray_lightcurve_sci_source = output_sci_source[2]
+    xray_pattern_sci_source = output_sci_source[3]
+    xray_spectrum_sci_source = output_sci_source[4]
+    xray_detx_sci_source = output_sci_source[5]
+    xray_image_sci_source = output_sci_source[6]
+    
+    xray_duration_sci_ring = output_sci_ring[0]
+    xray_evt_count_sci_ring = output_sci_ring[1]
+    xray_lightcurve_sci_ring = output_sci_ring[2]
+    xray_pattern_sci_ring = output_sci_ring[3]
+    xray_spectrum_sci_ring = output_sci_ring[4]
+    xray_detx_sci_ring = output_sci_ring[5]
+    xray_image_sci_ring = output_sci_ring[6]
+
+    area_pix_frac_sci_source = xray_image_sci_source.get_pixel_fraction()
+    area_pix_frac_sci_ring = xray_image_sci_ring.get_pixel_fraction()
+    xray_pattern_sci_ring.scale(area_pix_frac_sci_source/area_pix_frac_sci_ring)
+
+    xray_pattern_template = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
+    xray_pattern_template.add(xray_pattern_sci_source)
+    xray_pattern_template.add(xray_pattern_sci_ring,factor=-1.)
+
+    print ('prepare off sample time cuts')
+    
+    output_all_fov = read_event_file(off_sci_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_all_cor = read_event_file(off_sci_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    
+    off_duration_all_fov = output_all_fov[0]
+    off_evt_count_all_fov = output_all_fov[1]
+    off_lightcurve_all_fov = output_all_fov[2]
+    off_pattern_all_fov = output_all_fov[3]
+    off_spectrum_all_fov = output_all_fov[4]
+    off_detx_all_fov = output_all_fov[5]
+    off_image_all_fov = output_all_fov[6]
+    
+    off_duration_all_cor = output_all_cor[0]
+    off_evt_count_all_cor = output_all_cor[1]
+    off_lightcurve_all_cor = output_all_cor[2]
+    off_pattern_all_cor = output_all_cor[3]
+    off_spectrum_all_cor = output_all_cor[4]
+    off_detx_all_cor = output_all_cor[5]
+    off_image_all_cor = output_all_cor[6]
+    
+    off_duration_fwc_fov = output_fwc_fov[0]
+    off_evt_count_fwc_fov = output_fwc_fov[1]
+    off_lightcurve_fwc_fov = output_fwc_fov[2]
+    off_pattern_fwc_fov = output_fwc_fov[3]
+    off_spectrum_fwc_fov = output_fwc_fov[4]
+    off_detx_fwc_fov = output_fwc_fov[5]
+    off_image_fwc_fov = output_fwc_fov[6]
+    
+    off_duration_fwc_cor = output_fwc_cor[0]
+    off_evt_count_fwc_cor = output_fwc_cor[1]
+    off_lightcurve_fwc_cor = output_fwc_cor[2]
+    off_pattern_fwc_cor = output_fwc_cor[3]
+    off_spectrum_fwc_cor = output_fwc_cor[4]
+    off_detx_fwc_cor = output_fwc_cor[5]
+    off_image_fwc_cor = output_fwc_cor[6]
+    
+    area_pix_frac_all_fov = off_image_all_fov.get_pixel_fraction()
+    area_pix_frac_all_cor = off_image_all_cor.get_pixel_fraction()
+    area_pix_frac_fwc_fov = off_image_fwc_fov.get_pixel_fraction()
+    area_pix_frac_fwc_cor = off_image_fwc_cor.get_pixel_fraction()
+    
+    time_pix_frac_all_fov = off_lightcurve_all_fov.get_pixel_fraction()
+    time_expo_all_fov = off_duration_all_fov*time_pix_frac_all_fov
+    time_pix_frac_fwc_fov = off_lightcurve_fwc_fov.get_pixel_fraction()
+    time_expo_fwc_fov = off_duration_fwc_fov*time_pix_frac_fwc_fov
+    
+    time_pix_frac_all_cor = off_lightcurve_all_cor.get_pixel_fraction()
+    time_expo_all_cor = off_duration_all_cor*time_pix_frac_all_cor
+    time_pix_frac_fwc_cor = off_lightcurve_fwc_cor.get_pixel_fraction()
+    time_expo_fwc_cor = off_duration_fwc_cor*time_pix_frac_fwc_cor
+    
+    off_lightcurve_all_cor.scale(area_pix_frac_all_fov/area_pix_frac_all_cor)
+    off_lightcurve_fwc_fov.scale(fwc_2_sci_ratio*time_expo_all_fov/time_expo_fwc_fov)
+
+    mask_lc = make_timecut_mask(off_lightcurve_all_fov,off_lightcurve_all_cor) 
+
+    print ('apply off sample space and time masks')
+    
+    output_sci_fov = read_event_file(off_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    output_sci_cor = read_event_file(off_sci_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    
+    off_duration_sci_fov = output_sci_fov[0]
+    off_evt_count_sci_fov = output_sci_fov[1]
+    off_lightcurve_sci_fov = output_sci_fov[2]
+    off_pattern_sci_fov = output_sci_fov[3]
+    off_spectrum_sci_fov = output_sci_fov[4]
+    off_detx_sci_fov = output_sci_fov[5]
+    off_image_sci_fov = output_sci_fov[6]
+    
+    off_duration_sci_cor = output_sci_cor[0]
+    off_evt_count_sci_cor = output_sci_cor[1]
+    off_lightcurve_sci_cor = output_sci_cor[2]
+    off_pattern_sci_cor = output_sci_cor[3]
+    off_spectrum_sci_cor = output_sci_cor[4]
+    off_detx_sci_cor = output_sci_cor[5]
+    off_image_sci_cor = output_sci_cor[6]
+    
+    output_spf_fov = read_event_file(off_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range,ccd_id=ccd_id)
+    output_spf_cor = read_event_file(off_sci_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range,ccd_id=ccd_id)
+    
+    off_duration_spf_fov = output_spf_fov[0]
+    off_evt_count_spf_fov = output_spf_fov[1]
+    off_lightcurve_spf_fov = output_spf_fov[2]
+    off_pattern_spf_fov = output_spf_fov[3]
+    off_spectrum_spf_fov = output_spf_fov[4]
+    off_detx_spf_fov = output_spf_fov[5]
+    off_image_spf_fov = output_spf_fov[6]
+    
+    off_duration_spf_cor = output_spf_cor[0]
+    off_evt_count_spf_cor = output_spf_cor[1]
+    off_lightcurve_spf_cor = output_spf_cor[2]
+    off_pattern_spf_cor = output_spf_cor[3]
+    off_spectrum_spf_cor = output_spf_cor[4]
+    off_detx_spf_cor = output_spf_cor[5]
+    off_image_spf_cor = output_spf_cor[6]
+    
+    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    
+    off_duration_fwc_fov = output_fwc_fov[0]
+    off_evt_count_fwc_fov = output_fwc_fov[1]
+    off_lightcurve_fwc_fov = output_fwc_fov[2]
+    off_pattern_fwc_fov = output_fwc_fov[3]
+    off_spectrum_fwc_fov = output_fwc_fov[4]
+    off_detx_fwc_fov = output_fwc_fov[5]
+    off_image_fwc_fov = output_fwc_fov[6]
+    
+    off_duration_fwc_cor = output_fwc_cor[0]
+    off_evt_count_fwc_cor = output_fwc_cor[1]
+    off_lightcurve_fwc_cor = output_fwc_cor[2]
+    off_pattern_fwc_cor = output_fwc_cor[3]
+    off_spectrum_fwc_cor = output_fwc_cor[4]
+    off_detx_fwc_cor = output_fwc_cor[5]
+    off_image_fwc_cor = output_fwc_cor[6]
+
+    area_pix_frac_sci_fov = off_image_sci_fov.get_pixel_fraction()
+    area_pix_frac_sci_cor = off_image_sci_cor.get_pixel_fraction()
+    area_pix_frac_spf_fov = off_image_spf_fov.get_pixel_fraction()
+    area_pix_frac_spf_cor = off_image_spf_cor.get_pixel_fraction()
+    area_pix_frac_fwc_fov = off_image_fwc_fov.get_pixel_fraction()
+    area_pix_frac_fwc_cor = off_image_fwc_cor.get_pixel_fraction()
+    
+    time_pix_frac_sci_fov = off_lightcurve_sci_fov.get_pixel_fraction()
+    time_expo_sci_fov = off_duration_sci_fov*time_pix_frac_sci_fov
+    time_pix_frac_sci_cor = off_lightcurve_sci_cor.get_pixel_fraction()
+    time_expo_sci_cor = off_duration_sci_cor*time_pix_frac_sci_cor
+    
+    time_pix_frac_spf_fov = off_lightcurve_spf_fov.get_pixel_fraction()
+    time_expo_spf_fov = off_duration_spf_fov*time_pix_frac_spf_fov
+    time_pix_frac_spf_cor = off_lightcurve_spf_cor.get_pixel_fraction()
+    time_expo_spf_cor = off_duration_spf_cor*time_pix_frac_spf_cor
+    
+    time_pix_frac_fwc_fov = off_lightcurve_fwc_fov.get_pixel_fraction()
+    time_expo_fwc_fov = off_duration_fwc_fov*time_pix_frac_fwc_fov
+    time_pix_frac_fwc_cor = off_lightcurve_fwc_cor.get_pixel_fraction()
+    time_expo_fwc_cor = off_duration_fwc_cor*time_pix_frac_fwc_cor
+    
+    off_lightcurve_sci_cor.scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
+    off_lightcurve_spf_fov.scale(area_pix_frac_sci_fov/area_pix_frac_spf_fov*time_expo_sci_fov/time_expo_spf_fov)
+    off_lightcurve_spf_cor.scale(area_pix_frac_sci_fov/area_pix_frac_spf_cor*time_expo_sci_fov/time_expo_spf_cor)
+    off_lightcurve_fwc_fov.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
+    off_lightcurve_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
+    
+    off_spectrum_sci_cor.scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
+    off_spectrum_spf_fov.scale(area_pix_frac_sci_fov/area_pix_frac_spf_fov*time_expo_sci_fov/time_expo_spf_fov)
+    off_spectrum_spf_cor.scale(area_pix_frac_sci_fov/area_pix_frac_spf_cor*time_expo_sci_fov/time_expo_spf_cor)
+    off_spectrum_fwc_fov.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
+    off_spectrum_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
+    
+    off_pattern_sci_cor.scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
+    off_pattern_spf_fov.scale(area_pix_frac_sci_fov/area_pix_frac_spf_fov*time_expo_sci_fov/time_expo_spf_fov)
+    off_pattern_spf_cor.scale(area_pix_frac_sci_fov/area_pix_frac_spf_cor*time_expo_sci_fov/time_expo_spf_cor)
+    off_pattern_fwc_fov.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
+    off_pattern_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(off_lightcurve_all_fov.xaxis,off_lightcurve_all_fov.yaxis,yerr=off_lightcurve_all_fov.yerr,color='k',label='All FoV')
+    axbig.errorbar(off_lightcurve_sci_fov.xaxis,off_lightcurve_sci_fov.yaxis,yerr=off_lightcurve_sci_fov.yerr,color='red',label='Sci FoV')
+    axbig.errorbar(off_lightcurve_all_cor.xaxis,off_lightcurve_all_cor.yaxis,yerr=off_lightcurve_all_cor.yerr,color='green',label='All Cor')
+    axbig.set_yscale('log')
+    axbig.set_xlabel('Time')
+    axbig.legend(loc='best')
+    fig.savefig("../output_plots/lightcurve_off_timecut_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(off_spectrum_sci_fov.xaxis,off_spectrum_sci_fov.yaxis,yerr=off_spectrum_sci_fov.yerr,label='Sci FoV')
+    axbig.errorbar(off_spectrum_spf_fov.xaxis,off_spectrum_spf_fov.yaxis,yerr=off_spectrum_spf_fov.yerr,label='SPF FoV')
+    axbig.errorbar(off_spectrum_fwc_fov.xaxis,off_spectrum_fwc_fov.yaxis,yerr=off_spectrum_fwc_fov.yerr,label='FWC FoV')
+    axbig.set_xlabel('Channel')
+    axbig.legend(loc='best')
+    axbig.set_yscale('log')
+    fig.savefig("../output_plots/off_spectrum_fov_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(off_pattern_sci_fov.xaxis,off_pattern_sci_fov.yaxis,yerr=off_pattern_sci_fov.yerr,label='Sci FoV')
+    axbig.errorbar(off_pattern_spf_fov.xaxis,off_pattern_spf_fov.yaxis,yerr=off_pattern_spf_fov.yerr,label='SPF FoV')
+    axbig.errorbar(off_pattern_fwc_fov.xaxis,off_pattern_fwc_fov.yaxis,yerr=off_pattern_fwc_fov.yerr,label='FWC FoV')
+    axbig.set_xlabel('Channel')
+    axbig.legend(loc='best')
+    axbig.set_yscale('log')
+    fig.savefig("../output_plots/off_pattern_fov_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    sp_pattern_template = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
+    sp_spectrum_template = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+    
+    sp_pattern_template.add(off_pattern_spf_fov)
+    sp_pattern_template.add(off_pattern_sci_fov,factor=-1.)
+    sp_spectrum_template.add(off_spectrum_spf_fov)
+    sp_spectrum_template.add(off_spectrum_sci_fov,factor=-1.)
+
+    print ('prepare on sample time cuts')
+    
+    output_all_fov = read_event_file(on_sci_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_all_cor = read_event_file(on_sci_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    
+    on_duration_all_fov = output_all_fov[0]
+    on_evt_count_all_fov = output_all_fov[1]
+    on_lightcurve_all_fov = output_all_fov[2]
+    on_pattern_all_fov = output_all_fov[3]
+    on_spectrum_all_fov = output_all_fov[4]
+    on_detx_all_fov = output_all_fov[5]
+    on_image_all_fov = output_all_fov[6]
+    
+    on_duration_all_cor = output_all_cor[0]
+    on_evt_count_all_cor = output_all_cor[1]
+    on_lightcurve_all_cor = output_all_cor[2]
+    on_pattern_all_cor = output_all_cor[3]
+    on_spectrum_all_cor = output_all_cor[4]
+    on_detx_all_cor = output_all_cor[5]
+    on_image_all_cor = output_all_cor[6]
+    
+    on_duration_fwc_fov = output_fwc_fov[0]
+    on_evt_count_fwc_fov = output_fwc_fov[1]
+    on_lightcurve_fwc_fov = output_fwc_fov[2]
+    on_pattern_fwc_fov = output_fwc_fov[3]
+    on_spectrum_fwc_fov = output_fwc_fov[4]
+    on_detx_fwc_fov = output_fwc_fov[5]
+    on_image_fwc_fov = output_fwc_fov[6]
+    
+    on_duration_fwc_cor = output_fwc_cor[0]
+    on_evt_count_fwc_cor = output_fwc_cor[1]
+    on_lightcurve_fwc_cor = output_fwc_cor[2]
+    on_pattern_fwc_cor = output_fwc_cor[3]
+    on_spectrum_fwc_cor = output_fwc_cor[4]
+    on_detx_fwc_cor = output_fwc_cor[5]
+    on_image_fwc_cor = output_fwc_cor[6]
+
+    area_pix_frac_all_fov = on_image_all_fov.get_pixel_fraction()
+    area_pix_frac_all_cor = on_image_all_cor.get_pixel_fraction()
+    area_pix_frac_fwc_fov = on_image_fwc_fov.get_pixel_fraction()
+    area_pix_frac_fwc_cor = on_image_fwc_cor.get_pixel_fraction()
+    
+    time_pix_frac_all_fov = on_lightcurve_all_fov.get_pixel_fraction()
+    time_expo_all_fov = on_duration_all_fov*time_pix_frac_all_fov
+    time_pix_frac_fwc_fov = on_lightcurve_fwc_fov.get_pixel_fraction()
+    time_expo_fwc_fov = on_duration_fwc_fov*time_pix_frac_fwc_fov
+    
+    time_pix_frac_all_cor = on_lightcurve_all_cor.get_pixel_fraction()
+    time_expo_all_cor = on_duration_all_cor*time_pix_frac_all_cor
+    time_pix_frac_fwc_cor = on_lightcurve_fwc_cor.get_pixel_fraction()
+    time_expo_fwc_cor = on_duration_fwc_cor*time_pix_frac_fwc_cor
+    
+    on_lightcurve_all_cor.scale(area_pix_frac_all_fov/area_pix_frac_all_cor)
+    on_lightcurve_fwc_fov.scale(fwc_2_sci_ratio*time_expo_all_fov/time_expo_fwc_fov)
+
+    mask_lc = make_timecut_mask(on_lightcurve_all_fov,on_lightcurve_all_cor) 
+    
+    time_pix_frac_mask = mask_lc.get_pixel_fraction()
+    if time_pix_frac_mask>0.8:
+        mask_lc = None
+    if not SP_flare_mask:
+        mask_lc = None
+
+    print ('apply space and time masks')
+    
+    output_sci_fov = read_event_file(on_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    output_sci_cor = read_event_file(on_sci_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    
+    on_duration_sci_fov = output_sci_fov[0]
+    on_evt_count_sci_fov = output_sci_fov[1]
+    on_lightcurve_sci_fov = output_sci_fov[2]
+    on_pattern_sci_fov = output_sci_fov[3]
+    on_spectrum_sci_fov = output_sci_fov[4]
+    on_detx_sci_fov = output_sci_fov[5]
+    on_image_sci_fov = output_sci_fov[6]
+    
+    on_duration_sci_cor = output_sci_cor[0]
+    on_evt_count_sci_cor = output_sci_cor[1]
+    on_lightcurve_sci_cor = output_sci_cor[2]
+    on_pattern_sci_cor = output_sci_cor[3]
+    on_spectrum_sci_cor = output_sci_cor[4]
+    on_detx_sci_cor = output_sci_cor[5]
+    on_image_sci_cor = output_sci_cor[6]
+    
+    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    
+    on_duration_fwc_fov = output_fwc_fov[0]
+    on_evt_count_fwc_fov = output_fwc_fov[1]
+    on_lightcurve_fwc_fov = output_fwc_fov[2]
+    on_pattern_fwc_fov = output_fwc_fov[3]
+    on_spectrum_fwc_fov = output_fwc_fov[4]
+    on_detx_fwc_fov = output_fwc_fov[5]
+    on_image_fwc_fov = output_fwc_fov[6]
+    
+    on_duration_fwc_cor = output_fwc_cor[0]
+    on_evt_count_fwc_cor = output_fwc_cor[1]
+    on_lightcurve_fwc_cor = output_fwc_cor[2]
+    on_pattern_fwc_cor = output_fwc_cor[3]
+    on_spectrum_fwc_cor = output_fwc_cor[4]
+    on_detx_fwc_cor = output_fwc_cor[5]
+    on_image_fwc_cor = output_fwc_cor[6]
+    
+    area_pix_frac_sci_fov = on_image_sci_fov.get_pixel_fraction()
+    area_pix_frac_sci_cor = on_image_sci_cor.get_pixel_fraction()
+    area_pix_frac_fwc_fov = on_image_fwc_fov.get_pixel_fraction()
+    area_pix_frac_fwc_cor = on_image_fwc_cor.get_pixel_fraction()
+    
+    time_pix_frac_sci_fov = on_lightcurve_sci_fov.get_pixel_fraction()
+    time_expo_sci_fov = on_duration_sci_fov*time_pix_frac_sci_fov
+    time_pix_frac_sci_cor = on_lightcurve_sci_cor.get_pixel_fraction()
+    time_expo_sci_cor = on_duration_sci_cor*time_pix_frac_sci_cor
+    
+    time_pix_frac_fwc_fov = on_lightcurve_fwc_fov.get_pixel_fraction()
+    time_expo_fwc_fov = on_duration_fwc_fov*time_pix_frac_fwc_fov
+    time_pix_frac_fwc_cor = on_lightcurve_fwc_cor.get_pixel_fraction()
+    time_expo_fwc_cor = on_duration_fwc_cor*time_pix_frac_fwc_cor
+    
+    on_lightcurve_sci_cor.scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
+    on_lightcurve_fwc_fov.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
+    on_lightcurve_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
+    
+    on_spectrum_sci_cor.scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
+    on_spectrum_fwc_fov.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
+    on_spectrum_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
+    
+    on_pattern_sci_cor.scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
+    on_pattern_fwc_fov.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
+    on_pattern_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(on_lightcurve_all_fov.xaxis,on_lightcurve_all_fov.yaxis,yerr=on_lightcurve_all_fov.yerr,color='k',label='All FoV')
+    axbig.errorbar(on_lightcurve_sci_fov.xaxis,on_lightcurve_sci_fov.yaxis,yerr=on_lightcurve_sci_fov.yerr,color='red',label='Sci FoV')
+    axbig.errorbar(on_lightcurve_all_cor.xaxis,on_lightcurve_all_cor.yaxis,yerr=on_lightcurve_all_cor.yerr,color='green',label='All Cor')
+    axbig.set_yscale('log')
+    axbig.set_xlabel('Time')
+    axbig.legend(loc='best')
+    fig.savefig("../output_plots/lightcurve_on_timecut_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(on_spectrum_sci_fov.xaxis,on_spectrum_sci_fov.yaxis,yerr=on_spectrum_sci_fov.yerr,label='Sci FoV')
+    axbig.errorbar(on_spectrum_fwc_fov.xaxis,on_spectrum_fwc_fov.yaxis,yerr=on_spectrum_fwc_fov.yerr,label='FWC FoV')
+    axbig.set_xlabel('Channel')
+    axbig.legend(loc='best')
+    axbig.set_yscale('log')
+    fig.savefig("../output_plots/on_spectrum_fov_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(on_spectrum_sci_cor.xaxis,on_spectrum_sci_cor.yaxis,yerr=on_spectrum_sci_cor.yerr,label='Sci Cor')
+    axbig.errorbar(on_spectrum_fwc_cor.xaxis,on_spectrum_fwc_cor.yaxis,yerr=on_spectrum_fwc_cor.yerr,label='FWC Cor')
+    axbig.set_xlabel('Channel')
+    axbig.legend(loc='best')
+    axbig.set_yscale('log')
+    fig.savefig("../output_plots/on_spectrum_cor_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(on_pattern_sci_fov.xaxis,on_pattern_sci_fov.yaxis,yerr=on_pattern_sci_fov.yerr,label='Sci FoV')
+    axbig.errorbar(on_pattern_fwc_fov.xaxis,on_pattern_fwc_fov.yaxis,yerr=on_pattern_fwc_fov.yerr,label='FWC FoV')
+    axbig.set_xlabel('Channel')
+    axbig.legend(loc='best')
+    axbig.set_yscale('log')
+    fig.savefig("../output_plots/on_pattern_fov_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(on_pattern_sci_cor.xaxis,on_pattern_sci_cor.yaxis,yerr=on_pattern_sci_cor.yerr,label='Sci Cor')
+    axbig.errorbar(on_pattern_fwc_cor.xaxis,on_pattern_fwc_cor.yaxis,yerr=on_pattern_fwc_cor.yerr,label='FWC Cor')
+    axbig.set_xlabel('Channel')
+    axbig.legend(loc='best')
+    axbig.set_yscale('log')
+    fig.savefig("../output_plots/on_pattern_cor_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    print ('predict SP background')
+    
+    qpb_pattern_template = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
+    qpb_pattern_template.add(on_pattern_sci_cor)
+    qpb_spectrum_template = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+    qpb_spectrum_template.add(on_spectrum_sci_cor)
+
+    spf_scaling, xray_scaling = fit_pattern(on_pattern_sci_fov,xray_pattern_template,sp_pattern_template,qpb_pattern_template)
+    print ('xray_scaling = %s'%(xray_scaling))
+    print ('spf_scaling = %s'%(spf_scaling))
+        
+    xray_pattern_template.scale(xray_scaling)
+    sp_pattern_template.scale(spf_scaling)
+        
+    sp_spectrum_template.scale(spf_scaling)
+    on_spectrum_sci_fov_bkg = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+    on_spectrum_sci_fov_bkg.add(sp_spectrum_template)
+    on_spectrum_sci_fov_bkg.add(qpb_spectrum_template)
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(on_pattern_sci_fov.xaxis,on_pattern_sci_fov.yaxis,yerr=on_pattern_sci_fov.yerr,color='k',label='Data')
+    axbig.errorbar(xray_pattern_template.xaxis,xray_pattern_template.yaxis,yerr=xray_pattern_template.yerr,color='g',label='X-ray')
+    axbig.errorbar(qpb_pattern_template.xaxis,qpb_pattern_template.yaxis,yerr=qpb_pattern_template.yerr,color='b',label='QPB')
+    axbig.bar(sp_pattern_template.xaxis,sp_pattern_template.yaxis,color='orange',label='SP Flare')
+    axbig.set_yscale('log')
+    axbig.set_xlabel('PATTERN')
+    axbig.legend(loc='best')
+    fig.savefig("../output_plots/pattern_on_fov_scaled_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(on_spectrum_sci_fov.xaxis,on_spectrum_sci_fov.yaxis,yerr=on_spectrum_sci_fov.yerr,color='k',label='Data')
+    axbig.plot(on_spectrum_sci_fov_bkg.xaxis,on_spectrum_sci_fov_bkg.yaxis,color='red',label='Bkg')
+    axbig.plot(sp_spectrum_template.xaxis,sp_spectrum_template.yaxis,label='SP')
+    axbig.plot(qpb_spectrum_template.xaxis,qpb_spectrum_template.yaxis,label='QPB')
+    axbig.set_yscale('log')
+    axbig.set_xlabel('Channel')
+    axbig.legend(loc='best')
+    fig.savefig("../output_plots/spectrum_on_fit_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    xray_pattern_template.normalize()
+    qpb_pattern_template.normalize()
+    sp_pattern_template.normalize()
+    
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.plot(xray_pattern_template.xaxis,xray_pattern_template.yaxis,label='X-ray')
+    axbig.plot(qpb_pattern_template.xaxis,qpb_pattern_template.yaxis,label='QPB')
+    axbig.plot(sp_pattern_template.xaxis,sp_pattern_template.yaxis,label='SP')
+    axbig.set_yscale('log')
+    axbig.set_xlabel('Pattern')
+    axbig.legend(loc='best')
+    fig.savefig("../output_plots/pattern_template_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+
+    qpb_detx_template = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+    qpb_detx_template.add(on_detx_fwc_fov)
+    sp_detx_template = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+    sp_detx_template.add(on_detx_fwc_fov)
+    qpb_image_template = MyArray2D()
+    qpb_image_template.add(on_image_fwc_fov)
+    sp_image_template = MyArray2D()
+    sp_image_template.add(on_image_fwc_fov)
+
+    qpb_detx_template.scale(qpb_spectrum_template.integral()/qpb_detx_template.integral())
+    sp_detx_template.scale(sp_spectrum_template.integral()/sp_detx_template.integral())
+    on_detx_sci_fov_bkg = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+    on_detx_sci_fov_bkg.add(sp_detx_template)
+    on_detx_sci_fov_bkg.add(qpb_detx_template)
+    
+    qpb_image_template.scale(qpb_spectrum_template.integral()/qpb_image_template.integral())
+    sp_image_template.scale(sp_spectrum_template.integral()/sp_image_template.integral())
+    on_image_sci_fov_bkg = MyArray2D()
+    on_image_sci_fov_bkg.add(sp_image_template)
+    on_image_sci_fov_bkg.add(qpb_image_template)
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(on_detx_sci_fov.xaxis,on_detx_sci_fov.yaxis,yerr=on_detx_sci_fov.yerr,color='k',label='Data')
+    axbig.plot(on_detx_sci_fov_bkg.xaxis,on_detx_sci_fov_bkg.yaxis,color='red',label='Bkg')
+    axbig.plot(sp_detx_template.xaxis,sp_detx_template.yaxis,label='SP')
+    axbig.plot(qpb_detx_template.xaxis,qpb_detx_template.yaxis,label='QPB')
+    axbig.set_yscale('log')
+    axbig.set_ylim(bottom=1)
+    axbig.set_xlabel('DETX')
+    axbig.legend(loc='best')
+    fig.savefig("../output_plots/detx_on_fit_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+    
+    
+    fig.clf()
+    axbig = fig.add_subplot()
+    label_x = 'DETY'
+    label_y = 'DETX'
+    axbig.set_xlabel(label_x)
+    axbig.set_ylabel(label_y)
+    xmin = on_image_sci_fov.xaxis.min()
+    xmax = on_image_sci_fov.xaxis.max()
+    ymin = on_image_sci_fov.yaxis.min()
+    ymax = on_image_sci_fov.yaxis.max()
+    axbig.imshow(on_image_sci_fov.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+    fig.savefig("../output_plots/skymap_on_sci_fov_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+    
+    fig.clf()
+    axbig = fig.add_subplot()
+    label_x = 'DETY'
+    label_y = 'DETX'
+    axbig.set_xlabel(label_x)
+    axbig.set_ylabel(label_y)
+    xmin = on_image_sci_fov_bkg.xaxis.min()
+    xmax = on_image_sci_fov_bkg.xaxis.max()
+    ymin = on_image_sci_fov_bkg.yaxis.min()
+    ymax = on_image_sci_fov_bkg.yaxis.max()
+    axbig.imshow(on_image_sci_fov_bkg.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+    fig.savefig("../output_plots/skymap_on_sci_fov_bkg_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+    
+    on_image_sci_fov_excess = MyArray2D()
+    on_image_sci_fov_excess.add(on_image_sci_fov)
+    on_image_sci_fov_excess.add(on_image_sci_fov_bkg,factor=-1.)
+    
+    fig.clf()
+    axbig = fig.add_subplot()
+    label_x = 'DETY'
+    label_y = 'DETX'
+    axbig.set_xlabel(label_x)
+    axbig.set_ylabel(label_y)
+    xmin = on_image_sci_fov_excess.xaxis.min()
+    xmax = on_image_sci_fov_excess.xaxis.max()
+    ymin = on_image_sci_fov_excess.yaxis.min()
+    ymax = on_image_sci_fov_excess.yaxis.max()
+    axbig.imshow(on_image_sci_fov_excess.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+    fig.savefig("../output_plots/skymap_on_sci_fov_excess_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+    axbig.remove()
+
+    output_spectrum = [on_spectrum_sci_fov,on_spectrum_sci_fov_bkg,sp_spectrum_template,qpb_spectrum_template]
+    output_detx = [on_detx_sci_fov,on_detx_sci_fov_bkg,sp_detx_template,qpb_detx_template]
+
+    return output_spectrum, output_detx
+
+
+on_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+bkg_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+qpb_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+sp_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+
+on_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+bkg_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+qpb_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+sp_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+
+for eng in range(0,len(energy_array)-1):
+    for ccd in range(0,len(ana_ccd_bins)):
+        ana_output_spectrum, ana_output_detx = analyze_a_ccd_chip(energy_range=[energy_array[eng],energy_array[eng+1]],ccd_id=ana_ccd_bins[ccd])
+        on_spectrum_sum.add(ana_output_spectrum[0])
+        bkg_spectrum_sum.add(ana_output_spectrum[1])
+        sp_spectrum_sum.add(ana_output_spectrum[2])
+        qpb_spectrum_sum.add(ana_output_spectrum[3])
+        on_detx_sum.add(ana_output_detx[0])
+        bkg_detx_sum.add(ana_output_detx[1])
+        sp_detx_sum.add(ana_output_detx[2])
+        qpb_detx_sum.add(ana_output_detx[3])
 
 fig.clf()
 axbig = fig.add_subplot()
-axbig.errorbar(off_lightcurve_all_fov_sum.xaxis,off_lightcurve_all_fov_sum.yaxis,yerr=off_lightcurve_all_fov_sum.yerr,color='k',label='All FoV')
-axbig.errorbar(off_lightcurve_sci_fov_sum.xaxis,off_lightcurve_sci_fov_sum.yaxis,yerr=off_lightcurve_sci_fov_sum.yerr,color='red',label='Sci FoV')
-axbig.errorbar(off_lightcurve_all_cor_sum.xaxis,off_lightcurve_all_cor_sum.yaxis,yerr=off_lightcurve_all_cor_sum.yerr,color='green',label='All Cor')
-axbig.set_yscale('log')
-axbig.set_xlabel('Time')
-axbig.legend(loc='best')
-fig.savefig("../output_plots/lightcurve_off_timecut_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-off_spectrum_sci_fov_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-off_spectrum_spf_fov_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-off_spectrum_fwc_fov_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        off_spectrum_sci_fov_sum.add(off_spectrum_sci_fov[ebin][ccdid])
-        off_spectrum_spf_fov_sum.add(off_spectrum_spf_fov[ebin][ccdid])
-        off_spectrum_fwc_fov_sum.add(off_spectrum_fwc_fov[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(off_spectrum_sci_fov_sum.xaxis,off_spectrum_sci_fov_sum.yaxis,yerr=off_spectrum_sci_fov_sum.yerr,label='Sci FoV')
-axbig.errorbar(off_spectrum_spf_fov_sum.xaxis,off_spectrum_spf_fov_sum.yaxis,yerr=off_spectrum_spf_fov_sum.yerr,label='SPF FoV')
-axbig.errorbar(off_spectrum_fwc_fov_sum.xaxis,off_spectrum_fwc_fov_sum.yaxis,yerr=off_spectrum_fwc_fov_sum.yerr,label='FWC FoV')
-axbig.set_xlabel('Channel')
-axbig.legend(loc='best')
-axbig.set_yscale('log')
-fig.savefig("../output_plots/off_spectrum_fov_raw_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-off_spectrum_sci_cor_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-off_spectrum_spf_cor_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-off_spectrum_fwc_cor_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        off_spectrum_sci_cor_sum.add(off_spectrum_sci_cor[ebin][ccdid])
-        off_spectrum_spf_cor_sum.add(off_spectrum_spf_cor[ebin][ccdid])
-        off_spectrum_fwc_cor_sum.add(off_spectrum_fwc_cor[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(off_spectrum_sci_cor_sum.xaxis,off_spectrum_sci_cor_sum.yaxis,yerr=off_spectrum_sci_cor_sum.yerr,label='Sci Cor')
-axbig.errorbar(off_spectrum_spf_cor_sum.xaxis,off_spectrum_spf_cor_sum.yaxis,yerr=off_spectrum_spf_cor_sum.yerr,label='SPF Cor')
-axbig.errorbar(off_spectrum_fwc_cor_sum.xaxis,off_spectrum_fwc_cor_sum.yaxis,yerr=off_spectrum_fwc_cor_sum.yerr,label='FWC Cor')
-axbig.set_xlabel('Channel')
-axbig.legend(loc='best')
-axbig.set_yscale('log')
-fig.savefig("../output_plots/off_spectrum_cor_raw_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-off_pattern_sci_fov_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-off_pattern_spf_fov_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-off_pattern_fwc_fov_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        off_pattern_sci_fov_sum.add(off_pattern_sci_fov[ebin][ccdid])
-        off_pattern_spf_fov_sum.add(off_pattern_spf_fov[ebin][ccdid])
-        off_pattern_fwc_fov_sum.add(off_pattern_fwc_fov[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(off_pattern_sci_fov_sum.xaxis,off_pattern_sci_fov_sum.yaxis,yerr=off_pattern_sci_fov_sum.yerr,label='Sci FoV')
-axbig.errorbar(off_pattern_spf_fov_sum.xaxis,off_pattern_spf_fov_sum.yaxis,yerr=off_pattern_spf_fov_sum.yerr,label='SPF FoV')
-axbig.errorbar(off_pattern_fwc_fov_sum.xaxis,off_pattern_fwc_fov_sum.yaxis,yerr=off_pattern_fwc_fov_sum.yerr,label='FWC FoV')
-axbig.set_xlabel('Channel')
-axbig.legend(loc='best')
-axbig.set_yscale('log')
-fig.savefig("../output_plots/off_pattern_fov_raw_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-off_pattern_sci_cor_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-off_pattern_spf_cor_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-off_pattern_fwc_cor_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        off_pattern_sci_cor_sum.add(off_pattern_sci_cor[ebin][ccdid])
-        off_pattern_spf_cor_sum.add(off_pattern_spf_cor[ebin][ccdid])
-        off_pattern_fwc_cor_sum.add(off_pattern_fwc_cor[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(off_pattern_sci_cor_sum.xaxis,off_pattern_sci_cor_sum.yaxis,yerr=off_pattern_sci_cor_sum.yerr,label='Sci Cor')
-axbig.errorbar(off_pattern_spf_cor_sum.xaxis,off_pattern_spf_cor_sum.yaxis,yerr=off_pattern_spf_cor_sum.yerr,label='SPF Cor')
-axbig.errorbar(off_pattern_fwc_cor_sum.xaxis,off_pattern_fwc_cor_sum.yaxis,yerr=off_pattern_fwc_cor_sum.yerr,label='FWC Cor')
-axbig.set_xlabel('Channel')
-axbig.legend(loc='best')
-axbig.set_yscale('log')
-fig.savefig("../output_plots/off_pattern_cor_raw_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-
-sp_pattern_template = []
-sp_spectrum_template = []
-for ebin in range(0,len(energy_array)-1):
-    sp_pattern_template_dE = []
-    sp_spectrum_template_dE = []
-    for ccdid in range(0,len(all_ccd_bins)):
-        sp_pattern_template_dE += [MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)]
-        sp_spectrum_template_dE += [MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)]
-    sp_pattern_template += [sp_pattern_template_dE]
-    sp_spectrum_template += [sp_spectrum_template_dE]
-    
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        sp_pattern_template[ebin][ccdid].add(off_pattern_spf_fov_sum)
-        sp_pattern_template[ebin][ccdid].add(off_pattern_sci_fov_sum,factor=-1.)
-        sp_spectrum_template[ebin][ccdid].add(off_spectrum_spf_fov_sum)
-        sp_spectrum_template[ebin][ccdid].add(off_spectrum_sci_fov_sum,factor=-1.)
-
-
-print ('prepare on sample time cuts')
-
-output_all_fov = read_event_file(on_sci_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-output_all_cor = read_event_file(on_sci_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_array)
-
-on_duration_all_fov = output_all_fov[0]
-on_evt_count_all_fov = output_all_fov[1]
-on_lightcurve_all_fov = output_all_fov[2]
-on_pattern_all_fov = output_all_fov[3]
-on_spectrum_all_fov = output_all_fov[4]
-on_detx_all_fov = output_all_fov[5]
-on_image_all_fov = output_all_fov[6]
-
-on_duration_all_cor = output_all_cor[0]
-on_evt_count_all_cor = output_all_cor[1]
-on_lightcurve_all_cor = output_all_cor[2]
-on_pattern_all_cor = output_all_cor[3]
-on_spectrum_all_cor = output_all_cor[4]
-on_detx_all_cor = output_all_cor[5]
-on_image_all_cor = output_all_cor[6]
-
-on_duration_fwc_fov = output_fwc_fov[0]
-on_evt_count_fwc_fov = output_fwc_fov[1]
-on_lightcurve_fwc_fov = output_fwc_fov[2]
-on_pattern_fwc_fov = output_fwc_fov[3]
-on_spectrum_fwc_fov = output_fwc_fov[4]
-on_detx_fwc_fov = output_fwc_fov[5]
-on_image_fwc_fov = output_fwc_fov[6]
-
-on_duration_fwc_cor = output_fwc_cor[0]
-on_evt_count_fwc_cor = output_fwc_cor[1]
-on_lightcurve_fwc_cor = output_fwc_cor[2]
-on_pattern_fwc_cor = output_fwc_cor[3]
-on_spectrum_fwc_cor = output_fwc_cor[4]
-on_detx_fwc_cor = output_fwc_cor[5]
-on_image_fwc_cor = output_fwc_cor[6]
-
-
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-    
-        area_pix_frac_all_fov = on_image_all_fov[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_all_cor = on_image_all_cor[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_fwc_fov = on_image_fwc_fov[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_fwc_cor = on_image_fwc_cor[ebin][ccdid].get_pixel_fraction()
-        
-        time_pix_frac_all_fov = on_lightcurve_all_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_all_fov = on_duration_all_fov*time_pix_frac_all_fov
-        time_pix_frac_fwc_fov = on_lightcurve_fwc_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_fov = on_duration_fwc_fov*time_pix_frac_fwc_fov
-        
-        time_pix_frac_all_cor = on_lightcurve_all_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_all_cor = on_duration_all_cor*time_pix_frac_all_cor
-        time_pix_frac_fwc_cor = on_lightcurve_fwc_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_cor = on_duration_fwc_cor*time_pix_frac_fwc_cor
-    
-        on_lightcurve_all_cor[ebin][ccdid].scale(area_pix_frac_all_fov/area_pix_frac_all_cor)
-        on_lightcurve_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*time_expo_all_fov/time_expo_fwc_fov)
-
-on_lightcurve_all_fov_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-on_lightcurve_all_cor_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        on_lightcurve_all_fov_sum.add(on_lightcurve_all_fov[ebin][ccdid])
-        on_lightcurve_all_cor_sum.add(on_lightcurve_all_cor[ebin][ccdid])
-
-mask_lc = make_timecut_mask(on_lightcurve_all_fov_sum,on_lightcurve_all_cor_sum) 
-
-time_pix_frac_mask = mask_lc.get_pixel_fraction()
-if time_pix_frac_mask>0.8:
-    mask_lc = None
-if not SP_flare_mask:
-    mask_lc = None
-
-
-print ('apply space and time masks')
-
-output_sci_fov = read_event_file(on_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_array,ccd=ana_ccd_bins)
-output_sci_cor = read_event_file(on_sci_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_array,ccd=ana_ccd_bins)
-
-on_duration_sci_fov = output_sci_fov[0]
-on_evt_count_sci_fov = output_sci_fov[1]
-on_lightcurve_sci_fov = output_sci_fov[2]
-on_pattern_sci_fov = output_sci_fov[3]
-on_spectrum_sci_fov = output_sci_fov[4]
-on_detx_sci_fov = output_sci_fov[5]
-on_image_sci_fov = output_sci_fov[6]
-
-on_duration_sci_cor = output_sci_cor[0]
-on_evt_count_sci_cor = output_sci_cor[1]
-on_lightcurve_sci_cor = output_sci_cor[2]
-on_pattern_sci_cor = output_sci_cor[3]
-on_spectrum_sci_cor = output_sci_cor[4]
-on_detx_sci_cor = output_sci_cor[5]
-on_image_sci_cor = output_sci_cor[6]
-
-output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_array,ccd=ana_ccd_bins)
-output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_array,ccd=ana_ccd_bins)
-
-on_duration_fwc_fov = output_fwc_fov[0]
-on_evt_count_fwc_fov = output_fwc_fov[1]
-on_lightcurve_fwc_fov = output_fwc_fov[2]
-on_pattern_fwc_fov = output_fwc_fov[3]
-on_spectrum_fwc_fov = output_fwc_fov[4]
-on_detx_fwc_fov = output_fwc_fov[5]
-on_image_fwc_fov = output_fwc_fov[6]
-
-on_duration_fwc_cor = output_fwc_cor[0]
-on_evt_count_fwc_cor = output_fwc_cor[1]
-on_lightcurve_fwc_cor = output_fwc_cor[2]
-on_pattern_fwc_cor = output_fwc_cor[3]
-on_spectrum_fwc_cor = output_fwc_cor[4]
-on_detx_fwc_cor = output_fwc_cor[5]
-on_image_fwc_cor = output_fwc_cor[6]
-
-
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(ana_ccd_bins)):
-    
-        area_pix_frac_sci_fov = on_image_sci_fov[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_sci_cor = on_image_sci_cor[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_fwc_fov = on_image_fwc_fov[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_fwc_cor = on_image_fwc_cor[ebin][ccdid].get_pixel_fraction()
-        
-        time_pix_frac_sci_fov = on_lightcurve_sci_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_sci_fov = on_duration_sci_fov*time_pix_frac_sci_fov
-        time_pix_frac_sci_cor = on_lightcurve_sci_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_sci_cor = on_duration_sci_cor*time_pix_frac_sci_cor
-        
-        time_pix_frac_fwc_fov = on_lightcurve_fwc_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_fov = on_duration_fwc_fov*time_pix_frac_fwc_fov
-        time_pix_frac_fwc_cor = on_lightcurve_fwc_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_cor = on_duration_fwc_cor*time_pix_frac_fwc_cor
-    
-        on_lightcurve_sci_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
-        on_lightcurve_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
-        on_lightcurve_fwc_cor[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
-    
-        on_spectrum_sci_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
-        on_spectrum_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
-        on_spectrum_fwc_cor[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
-        
-        on_pattern_sci_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
-        on_pattern_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
-        on_pattern_fwc_cor[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
-
-on_lightcurve_sci_fov_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-on_lightcurve_sci_cor_sum = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        on_lightcurve_sci_fov_sum.add(on_lightcurve_sci_fov[ebin][ccdid])
-        on_lightcurve_sci_cor_sum.add(on_lightcurve_sci_cor[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(on_lightcurve_all_fov_sum.xaxis,on_lightcurve_all_fov_sum.yaxis,yerr=on_lightcurve_all_fov_sum.yerr,color='k',label='All FoV')
-axbig.errorbar(on_lightcurve_sci_fov_sum.xaxis,on_lightcurve_sci_fov_sum.yaxis,yerr=on_lightcurve_sci_fov_sum.yerr,color='red',label='Sci FoV')
-axbig.errorbar(on_lightcurve_all_cor_sum.xaxis,on_lightcurve_all_cor_sum.yaxis,yerr=on_lightcurve_all_cor_sum.yerr,color='green',label='All Cor')
-axbig.set_yscale('log')
-axbig.set_xlabel('Time')
-axbig.legend(loc='best')
-fig.savefig("../output_plots/lightcurve_on_timecut_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-on_spectrum_sci_fov_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-on_spectrum_fwc_fov_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        on_spectrum_sci_fov_sum.add(on_spectrum_sci_fov[ebin][ccdid])
-        on_spectrum_fwc_fov_sum.add(on_spectrum_fwc_fov[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(on_spectrum_sci_fov_sum.xaxis,on_spectrum_sci_fov_sum.yaxis,yerr=on_spectrum_sci_fov_sum.yerr,label='Sci FoV')
-axbig.errorbar(on_spectrum_fwc_fov_sum.xaxis,on_spectrum_fwc_fov_sum.yaxis,yerr=on_spectrum_fwc_fov_sum.yerr,label='FWC FoV')
-axbig.set_xlabel('Channel')
-axbig.legend(loc='best')
-axbig.set_yscale('log')
-fig.savefig("../output_plots/on_spectrum_fov_raw_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-on_spectrum_sci_cor_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-on_spectrum_fwc_cor_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        on_spectrum_sci_cor_sum.add(on_spectrum_sci_cor[ebin][ccdid])
-        on_spectrum_fwc_cor_sum.add(on_spectrum_fwc_cor[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(on_spectrum_sci_cor_sum.xaxis,on_spectrum_sci_cor_sum.yaxis,yerr=on_spectrum_sci_cor_sum.yerr,label='Sci Cor')
-axbig.errorbar(on_spectrum_fwc_cor_sum.xaxis,on_spectrum_fwc_cor_sum.yaxis,yerr=on_spectrum_fwc_cor_sum.yerr,label='FWC Cor')
-axbig.set_xlabel('Channel')
-axbig.legend(loc='best')
-axbig.set_yscale('log')
-fig.savefig("../output_plots/on_spectrum_cor_raw_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-on_pattern_sci_fov_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-on_pattern_fwc_fov_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        on_pattern_sci_fov_sum.add(on_pattern_sci_fov[ebin][ccdid])
-        on_pattern_fwc_fov_sum.add(on_pattern_fwc_fov[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(on_pattern_sci_fov_sum.xaxis,on_pattern_sci_fov_sum.yaxis,yerr=on_pattern_sci_fov_sum.yerr,label='Sci FoV')
-axbig.errorbar(on_pattern_fwc_fov_sum.xaxis,on_pattern_fwc_fov_sum.yaxis,yerr=on_pattern_fwc_fov_sum.yerr,label='FWC FoV')
-axbig.set_xlabel('Channel')
-axbig.legend(loc='best')
-axbig.set_yscale('log')
-fig.savefig("../output_plots/on_pattern_fov_raw_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-on_pattern_sci_cor_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-on_pattern_fwc_cor_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(all_ccd_bins)):
-        on_pattern_sci_cor_sum.add(on_pattern_sci_cor[ebin][ccdid])
-        on_pattern_fwc_cor_sum.add(on_pattern_fwc_cor[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(on_pattern_sci_cor_sum.xaxis,on_pattern_sci_cor_sum.yaxis,yerr=on_pattern_sci_cor_sum.yerr,label='Sci Cor')
-axbig.errorbar(on_pattern_fwc_cor_sum.xaxis,on_pattern_fwc_cor_sum.yaxis,yerr=on_pattern_fwc_cor_sum.yerr,label='FWC Cor')
-axbig.set_xlabel('Channel')
-axbig.legend(loc='best')
-axbig.set_yscale('log')
-fig.savefig("../output_plots/on_pattern_cor_raw_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-
-
-print ('predict SP background')
-
-qpb_pattern_template = []
-qpb_spectrum_template = []
-for ebin in range(0,len(energy_array)-1):
-    qpb_pattern_template_dE = []
-    qpb_spectrum_template_dE = []
-    for ccdid in range(0,len(ana_ccd_bins)):
-        qpb_pattern_template_dE += [MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)]
-        qpb_pattern_template_dE[ccdid].add(on_pattern_sci_cor[ebin][ccdid])
-        qpb_spectrum_template_dE += [MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)]
-        qpb_spectrum_template_dE[ccdid].add(on_spectrum_sci_cor[ebin][ccdid])
-    qpb_pattern_template += [qpb_pattern_template_dE]
-    qpb_spectrum_template += [qpb_spectrum_template_dE]
-
-on_spectrum_sci_fov_bkg = [] 
-spf_scaling_array = []
-xray_scaling_array = []
-for ebin in range(0,len(energy_array)-1):
-    on_spectrum_sci_fov_bkg_dE = [] 
-    spf_scaling_array_dE = []
-    xray_scaling_array_dE = []
-    for ccdid in range(0,len(ana_ccd_bins)):
-    
-        spf_scaling, xray_scaling = fit_pattern(on_pattern_sci_fov[ebin][ccdid],xray_pattern_template[ebin][ccdid],sp_pattern_template[ebin][ccdid],qpb_pattern_template[ebin][ccdid])
-        print ('xray_scaling = %s'%(xray_scaling))
-        print ('spf_scaling = %s'%(spf_scaling))
-        spf_scaling_array_dE += [spf_scaling]
-        xray_scaling_array_dE += [xray_scaling]
-    
-        xray_pattern_template[ebin][ccdid].scale(xray_scaling)
-        sp_pattern_template[ebin][ccdid].scale(spf_scaling)
-    
-        sp_spectrum_template[ebin][ccdid].scale(spf_scaling)
-        on_spectrum_sci_fov_bkg_dE += [MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)]
-        on_spectrum_sci_fov_bkg_dE[ccdid].add(sp_spectrum_template[ebin][ccdid])
-        on_spectrum_sci_fov_bkg_dE[ccdid].add(qpb_spectrum_template[ebin][ccdid])
-    on_spectrum_sci_fov_bkg += [on_spectrum_sci_fov_bkg_dE]
-    spf_scaling_array += [spf_scaling_array_dE]
-    xray_scaling_array += [xray_scaling_array_dE]
-
-
-sp_spectrum_template_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-qpb_spectrum_template_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-sp_pattern_template_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-qpb_pattern_template_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-xray_pattern_template_sum = MyArray1D(bin_start=0,bin_end=25,pixel_scale=1)
-on_spectrum_sci_fov_bkg_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(ana_ccd_bins)):
-        sp_spectrum_template_sum.add(sp_spectrum_template[ebin][ccdid])
-        qpb_spectrum_template_sum.add(qpb_spectrum_template[ebin][ccdid])
-        sp_pattern_template_sum.add(sp_pattern_template[ebin][ccdid])
-        qpb_pattern_template_sum.add(qpb_pattern_template[ebin][ccdid])
-        xray_pattern_template_sum.add(xray_pattern_template[ebin][ccdid])
-        on_spectrum_sci_fov_bkg_sum.add(on_spectrum_sci_fov_bkg[ebin][ccdid])
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(on_pattern_sci_fov_sum.xaxis,on_pattern_sci_fov_sum.yaxis,yerr=on_pattern_sci_fov_sum.yerr,color='k',label='Data')
-axbig.errorbar(xray_pattern_template_sum.xaxis,xray_pattern_template_sum.yaxis,yerr=xray_pattern_template_sum.yerr,color='g',label='X-ray')
-axbig.errorbar(qpb_pattern_template_sum.xaxis,qpb_pattern_template_sum.yaxis,yerr=qpb_pattern_template_sum.yerr,color='b',label='QPB')
-axbig.bar(sp_pattern_template_sum.xaxis,sp_pattern_template_sum.yaxis,color='orange',label='SP Flare')
-axbig.set_yscale('log')
-axbig.set_xlabel('PATTERN')
-axbig.legend(loc='best')
-fig.savefig("../output_plots/pattern_on_fov_scaled_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(on_spectrum_sci_fov_sum.xaxis,on_spectrum_sci_fov_sum.yaxis,yerr=on_spectrum_sci_fov_sum.yerr,color='k',label='Data')
-axbig.plot(on_spectrum_sci_fov_bkg_sum.xaxis,on_spectrum_sci_fov_bkg_sum.yaxis,color='red',label='Bkg')
-axbig.plot(sp_spectrum_template_sum.xaxis,sp_spectrum_template_sum.yaxis,label='SP')
-axbig.plot(qpb_spectrum_template_sum.xaxis,qpb_spectrum_template_sum.yaxis,label='QPB')
+axbig.errorbar(on_spectrum_sum.xaxis,on_spectrum_sum.yaxis,yerr=on_spectrum_sum.yerr,color='k',label='Data')
+axbig.plot(bkg_spectrum_sum.xaxis,bkg_spectrum_sum.yaxis,color='red',label='Bkg')
+axbig.plot(sp_spectrum_sum.xaxis,sp_spectrum_sum.yaxis,label='SP')
+axbig.plot(qpb_spectrum_sum.xaxis,qpb_spectrum_sum.yaxis,label='QPB')
 axbig.set_yscale('log')
 axbig.set_xlabel('Channel')
 axbig.legend(loc='best')
-fig.savefig("../output_plots/spectrum_on_fit_%s.png"%(plot_tag),bbox_inches='tight')
+fig.savefig("../output_plots/spectrum_on_fit_sum_%s.png"%(plot_tag),bbox_inches='tight')
 axbig.remove()
-
-
-xray_pattern_template_sum.normalize()
-qpb_pattern_template_sum.normalize()
-sp_pattern_template_sum.normalize()
 
 fig.clf()
 axbig = fig.add_subplot()
-axbig.plot(xray_pattern_template_sum.xaxis,xray_pattern_template_sum.yaxis,label='X-ray')
-axbig.plot(qpb_pattern_template_sum.xaxis,qpb_pattern_template_sum.yaxis,label='QPB')
-axbig.plot(sp_pattern_template_sum.xaxis,sp_pattern_template_sum.yaxis,label='SP')
-axbig.set_yscale('log')
-axbig.set_xlabel('Pattern')
-axbig.legend(loc='best')
-fig.savefig("../output_plots/pattern_template_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
-
-
-
-print ('get science data')
-
-output_sci_fov = read_event_file(on_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_array,ccd=ana_ccd_bins)
-output_sci_cor = read_event_file(on_sci_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_array,ccd=ana_ccd_bins)
-
-on_duration_sci_fov = output_sci_fov[0]
-on_evt_count_sci_fov = output_sci_fov[1]
-on_lightcurve_sci_fov = output_sci_fov[2]
-on_pattern_sci_fov = output_sci_fov[3]
-on_spectrum_sci_fov = output_sci_fov[4]
-on_detx_sci_fov = output_sci_fov[5]
-on_image_sci_fov = output_sci_fov[6]
-
-on_duration_sci_cor = output_sci_cor[0]
-on_evt_count_sci_cor = output_sci_cor[1]
-on_lightcurve_sci_cor = output_sci_cor[2]
-on_pattern_sci_cor = output_sci_cor[3]
-on_spectrum_sci_cor = output_sci_cor[4]
-on_detx_sci_cor = output_sci_cor[5]
-on_image_sci_cor = output_sci_cor[6]
-
-output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_array,ccd=ana_ccd_bins)
-output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_array,ccd=ana_ccd_bins)
-
-on_duration_fwc_fov = output_fwc_fov[0]
-on_evt_count_fwc_fov = output_fwc_fov[1]
-on_lightcurve_fwc_fov = output_fwc_fov[2]
-on_pattern_fwc_fov = output_fwc_fov[3]
-on_spectrum_fwc_fov = output_fwc_fov[4]
-on_detx_fwc_fov = output_fwc_fov[5]
-on_image_fwc_fov = output_fwc_fov[6]
-
-on_duration_fwc_cor = output_fwc_cor[0]
-on_evt_count_fwc_cor = output_fwc_cor[1]
-on_lightcurve_fwc_cor = output_fwc_cor[2]
-on_pattern_fwc_cor = output_fwc_cor[3]
-on_spectrum_fwc_cor = output_fwc_cor[4]
-on_detx_fwc_cor = output_fwc_cor[5]
-on_image_fwc_cor = output_fwc_cor[6]
-
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(ana_ccd_bins)):
-    
-        area_pix_frac_sci_fov = on_image_sci_fov[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_sci_cor = on_image_sci_cor[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_fwc_fov = on_image_fwc_fov[ebin][ccdid].get_pixel_fraction()
-        area_pix_frac_fwc_cor = on_image_fwc_cor[ebin][ccdid].get_pixel_fraction()
-        
-        time_pix_frac_sci_fov = on_lightcurve_sci_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_sci_fov = on_duration_sci_fov*time_pix_frac_sci_fov
-        time_pix_frac_sci_cor = on_lightcurve_sci_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_sci_cor = on_duration_sci_cor*time_pix_frac_sci_cor
-        
-        time_pix_frac_fwc_fov = on_lightcurve_fwc_fov[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_fov = on_duration_fwc_fov*time_pix_frac_fwc_fov
-        time_pix_frac_fwc_cor = on_lightcurve_fwc_cor[ebin][ccdid].get_pixel_fraction()
-        time_expo_fwc_cor = on_duration_fwc_cor*time_pix_frac_fwc_cor
-    
-        on_lightcurve_sci_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
-        on_lightcurve_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
-        on_lightcurve_fwc_cor[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
-    
-        on_spectrum_sci_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
-        on_spectrum_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
-        on_spectrum_fwc_cor[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
-        
-        on_pattern_sci_cor[ebin][ccdid].scale(area_pix_frac_sci_fov/area_pix_frac_sci_cor)
-        on_pattern_fwc_fov[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_fov*time_expo_sci_fov/time_expo_fwc_fov)
-        on_pattern_fwc_cor[ebin][ccdid].scale(fwc_2_sci_ratio*area_pix_frac_sci_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_fwc_cor)
-
-
-qpb_detx_template = []
-sp_detx_template = []
-qpb_image_template = []
-sp_image_template = []
-for ebin in range(0,len(energy_array)-1):
-    qpb_detx_template_dE = []
-    sp_detx_template_dE = []
-    qpb_image_template_dE = []
-    sp_image_template_dE = []
-    for ccdid in range(0,len(ana_ccd_bins)):
-        qpb_detx_template_dE += [MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)]
-        qpb_detx_template_dE[ccdid].add(on_detx_fwc_fov[ebin][ccdid])
-        sp_detx_template_dE += [MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)]
-        sp_detx_template_dE[ccdid].add(on_detx_fwc_fov[ebin][ccdid])
-        qpb_image_template_dE += [MyArray2D()]
-        qpb_image_template_dE[ccdid].add(on_image_fwc_fov[ebin][ccdid])
-        sp_image_template_dE += [MyArray2D()]
-        sp_image_template_dE[ccdid].add(on_image_fwc_fov[ebin][ccdid])
-    qpb_detx_template += [qpb_detx_template_dE]
-    sp_detx_template += [sp_detx_template_dE]
-    qpb_image_template += [qpb_image_template_dE]
-    sp_image_template += [sp_image_template_dE]
-
-on_detx_sci_fov_bkg = []
-on_image_sci_fov_bkg = []
-for ebin in range(0,len(energy_array)-1):
-    on_detx_sci_fov_bkg_dE = []
-    on_image_sci_fov_bkg_dE = []
-    for ccdid in range(0,len(ana_ccd_bins)):
-    
-        spf_scaling = spf_scaling_array[ebin][ccdid]
-        xray_scaling = xray_scaling_array[ebin][ccdid]
-    
-        qpb_detx_template[ebin][ccdid].scale(qpb_spectrum_template[ebin][ccdid].integral()/qpb_detx_template[ebin][ccdid].integral())
-        sp_detx_template[ebin][ccdid].scale(sp_spectrum_template[ebin][ccdid].integral()/sp_detx_template[ebin][ccdid].integral())
-        on_detx_sci_fov_bkg_dE += [MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)]
-        on_detx_sci_fov_bkg_dE[ccdid].add(sp_detx_template[ebin][ccdid])
-        on_detx_sci_fov_bkg_dE[ccdid].add(qpb_detx_template[ebin][ccdid])
-    
-        qpb_image_template[ebin][ccdid].scale(qpb_spectrum_template[ebin][ccdid].integral()/qpb_image_template[ebin][ccdid].integral())
-        sp_image_template[ebin][ccdid].scale(sp_spectrum_template[ebin][ccdid].integral()/sp_image_template[ebin][ccdid].integral())
-        on_image_sci_fov_bkg_dE += [MyArray2D()]
-        on_image_sci_fov_bkg_dE[ccdid].add(sp_image_template[ebin][ccdid])
-        on_image_sci_fov_bkg_dE[ccdid].add(qpb_image_template[ebin][ccdid])
-
-    on_detx_sci_fov_bkg += [on_detx_sci_fov_bkg_dE]
-    on_image_sci_fov_bkg += [on_image_sci_fov_bkg_dE]
-
-sp_detx_template_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
-qpb_detx_template_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
-on_detx_sci_fov_bkg_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
-on_detx_sci_fov_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
-sp_image_template_sum = MyArray2D()
-qpb_image_template_sum = MyArray2D()
-on_image_sci_fov_bkg_sum = MyArray2D()
-on_image_sci_fov_sum = MyArray2D()
-for ebin in range(0,len(energy_array)-1):
-    for ccdid in range(0,len(ana_ccd_bins)):
-        sp_detx_template_sum.add(sp_detx_template[ebin][ccdid])
-        qpb_detx_template_sum.add(qpb_detx_template[ebin][ccdid])
-        on_detx_sci_fov_bkg_sum.add(on_detx_sci_fov_bkg[ebin][ccdid])
-        on_detx_sci_fov_sum.add(on_detx_sci_fov[ebin][ccdid])
-        sp_image_template_sum.add(sp_image_template[ebin][ccdid])
-        qpb_image_template_sum.add(qpb_image_template[ebin][ccdid])
-        on_image_sci_fov_bkg_sum.add(on_image_sci_fov_bkg[ebin][ccdid])
-        on_image_sci_fov_sum.add(on_image_sci_fov[ebin][ccdid])
-
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(on_detx_sci_fov_sum.xaxis,on_detx_sci_fov_sum.yaxis,yerr=on_detx_sci_fov_sum.yerr,color='k',label='Data')
-axbig.plot(on_detx_sci_fov_bkg_sum.xaxis,on_detx_sci_fov_bkg_sum.yaxis,color='red',label='Bkg')
-axbig.plot(sp_detx_template_sum.xaxis,sp_detx_template_sum.yaxis,label='SP')
-axbig.plot(qpb_detx_template_sum.xaxis,qpb_detx_template_sum.yaxis,label='QPB')
+axbig.errorbar(on_detx_sum.xaxis,on_detx_sum.yaxis,yerr=on_detx_sum.yerr,color='k',label='Data')
+axbig.plot(bkg_detx_sum.xaxis,bkg_detx_sum.yaxis,color='red',label='Bkg')
+axbig.plot(sp_detx_sum.xaxis,sp_detx_sum.yaxis,label='SP')
+axbig.plot(qpb_detx_sum.xaxis,qpb_detx_sum.yaxis,label='QPB')
 axbig.set_yscale('log')
 axbig.set_ylim(bottom=1)
 axbig.set_xlabel('DETX')
 axbig.legend(loc='best')
-fig.savefig("../output_plots/detx_on_fit_%s.png"%(plot_tag),bbox_inches='tight')
+fig.savefig("../output_plots/detx_on_fit_sum_%s.png"%(plot_tag),bbox_inches='tight')
 axbig.remove()
 
 
-fig.clf()
-axbig = fig.add_subplot()
-label_x = 'DETY'
-label_y = 'DETX'
-axbig.set_xlabel(label_x)
-axbig.set_ylabel(label_y)
-xmin = on_image_sci_fov_sum.xaxis.min()
-xmax = on_image_sci_fov_sum.xaxis.max()
-ymin = on_image_sci_fov_sum.yaxis.min()
-ymax = on_image_sci_fov_sum.yaxis.max()
-axbig.imshow(on_image_sci_fov_sum.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("../output_plots/skymap_on_sci_fov_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
 
-fig.clf()
-axbig = fig.add_subplot()
-label_x = 'DETY'
-label_y = 'DETX'
-axbig.set_xlabel(label_x)
-axbig.set_ylabel(label_y)
-xmin = on_image_sci_fov_bkg_sum.xaxis.min()
-xmax = on_image_sci_fov_bkg_sum.xaxis.max()
-ymin = on_image_sci_fov_bkg_sum.yaxis.min()
-ymax = on_image_sci_fov_bkg_sum.yaxis.max()
-axbig.imshow(on_image_sci_fov_bkg_sum.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("../output_plots/skymap_on_sci_fov_bkg_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
 
-on_image_sci_fov_excess = MyArray2D()
-on_image_sci_fov_excess.add(on_image_sci_fov_sum)
-on_image_sci_fov_excess.add(on_image_sci_fov_bkg_sum,factor=-1.)
 
-fig.clf()
-axbig = fig.add_subplot()
-label_x = 'DETY'
-label_y = 'DETX'
-axbig.set_xlabel(label_x)
-axbig.set_ylabel(label_y)
-xmin = on_image_sci_fov_excess.xaxis.min()
-xmax = on_image_sci_fov_excess.xaxis.max()
-ymin = on_image_sci_fov_excess.yaxis.min()
-ymax = on_image_sci_fov_excess.yaxis.max()
-axbig.imshow(on_image_sci_fov_excess.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("../output_plots/skymap_on_sci_fov_excess_%s.png"%(plot_tag),bbox_inches='tight')
-axbig.remove()
+
+
+
+
 
 
 
