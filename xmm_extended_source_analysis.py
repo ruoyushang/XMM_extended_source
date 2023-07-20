@@ -13,6 +13,7 @@ import astropy.utils as utils
 from astropy.nddata import Cutout2D
 from astropy.table import Table
 import numpy as np
+from numpy.linalg import inv
 from operator import itemgetter, attrgetter
 from scipy.optimize import curve_fit
 from scipy.optimize import least_squares
@@ -24,10 +25,19 @@ figsize_y = 6.
 fig.set_figheight(figsize_y)
 fig.set_figwidth(figsize_x)
 
+on_sample = sys.argv[1]
+on_obsID = sys.argv[2]
+
+#diagnostic_plots = True
+diagnostic_plots = False
+
+#detector = 'mos1S001'
+detector = 'mos2S002'
+
 energy_array = [2000,3000,5000,8000,12000]
 #energy_array = [2000,12000]
-#ana_ccd_bins = [1,2,3,4,5,6,7]
-ana_ccd_bins = [0]
+ana_ccd_bins = [1,2,3,4,5,6,7]
+#ana_ccd_bins = [0]
 
 ch_low = 200
 ch_high = 12000
@@ -38,11 +48,74 @@ t_scale = 0.05
 detx_low = -20000
 detx_high = 20000
 detx_scale = 500
+detr_low = 0
+detr_high = 20000
+detr_scale = 500
+
+src_ra = 0
+src_dec = 0
+if 'Cas_A' in on_sample:
+    src_ra = 350.85
+    src_dec = 58.84
+
+def get_conversion_mtx():
+    radec_filename = '../%s/%s/analysis/pointing_coord.txt'%(on_sample,on_obsID)
+    detxy_filename = '../%s/%s/analysis/det_coord_%s.txt'%(on_sample,on_obsID,detector)
+    ref_ra = []
+    ref_dec = []
+    radec_file = open(radec_filename)
+    for line in radec_file:
+        sky_ra = line.split()[1]
+        sky_dec = line.split()[2]
+        ref_ra += [float(sky_ra)]
+        ref_dec += [float(sky_dec)]
+    ref_detx = []
+    ref_dety = []
+    detxy_file = open(detxy_filename)
+    for line in detxy_file:
+        det_x = line.split()[1]
+        det_y = line.split()[2]
+        ref_detx += [float(det_x)]
+        ref_dety += [float(det_y)]
+    delta_ra = []
+    delta_dec = []
+    delta_detx = []
+    delta_dety = []
+    for point in range(1,len(ref_ra)):
+        delta_ra += [ref_ra[point]-ref_ra[0]]
+        delta_dec += [ref_dec[point]-ref_dec[0]]
+        delta_detx += [ref_detx[point]-ref_detx[0]]
+        delta_dety += [ref_dety[point]-ref_dety[0]]
+    mtx_delta_sky = np.matrix([[delta_ra[0],delta_dec[0]],[delta_ra[1],delta_dec[1]]])
+    mtx_delta_det = np.matrix([[delta_detx[0],delta_dety[0]],[delta_detx[1],delta_dety[1]]])
+    att_ra = ref_ra[0]
+    att_dec = ref_dec[0]
+    att_detx = ref_detx[0]
+    att_dety = ref_dety[0]
+    inv_mtx_delta_det = inv(mtx_delta_det)
+    inv_mtx_delta_sky = inv(mtx_delta_sky)
+    mtx_conv_sky_2_det = np.matmul(mtx_delta_det,inv_mtx_delta_sky)
+    mtx_conv_det_2_sky = np.matmul(mtx_delta_sky,inv_mtx_delta_det)
+    att_detxy = np.array([att_detx,att_dety])
+    delta_att_radec = np.matmul(mtx_conv_det_2_sky,att_detxy)
+    att_radec = [delta_att_radec[0,0]+ref_ra[0], delta_att_radec[0,1]+ref_dec[0]]
+
+    return att_radec, mtx_conv_sky_2_det, mtx_conv_det_2_sky
+
+global_att_radec, global_mtx_conv_sky_2_det, global_mtx_conv_det_2_sky = get_conversion_mtx()
+
+print ('global_att_radec:')
+print (global_att_radec)
+
+pix_size = (1./60.)/1200. # degree
+if not 'extragalactic' in on_sample:
+    detr_low = pow(pow(src_ra-global_att_radec[0],2)+pow(src_dec-global_att_radec[1],2),0.5)-20000*pix_size
+    detr_low = max(0.,detr_low)
+    #detr_high = pow(pow(src_ra-global_att_radec[0],2)+pow(src_dec-global_att_radec[1],2),0.5)+20000*pix_size
+    detr_high = detr_low+60000*pix_size
+    detr_scale = detr_scale*pix_size
 
 fwc_2_sci_ratio = 0.4
-
-diagnostic_plots = True
-#diagnostic_plots = False
 
 class MyArray2D:
 
@@ -242,16 +315,29 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
     spectrum_array = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     detx_array = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
     image_array = MyArray2D()
+    detr_array = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
 
     time_start = events[0]['TIME']
     time_end = events[len(events)-1]['TIME']
     obs_duration = time_end-time_start
+
     for evt in range(0,len(events)):
+
+        if (evt%10)!=0: continue
+
         evt_time = events[evt]['TIME']
         evt_pattern = events[evt]['PATTERN']
         evt_pi = events[evt]['PI']
+
         evt_detx = events[evt]['DETX']
         evt_dety = events[evt]['DETY']
+        evt_detr = pow(pow(evt_detx,2)+pow(evt_dety,2),0.5)
+        if not 'extragalactic' in on_sample:
+            evt_detxy = np.array([evt_detx,evt_dety])
+            evt_xy = np.matmul(global_mtx_conv_det_2_sky,evt_detxy)
+            evt_x = evt_xy[0,0]+global_att_radec[0]
+            evt_y = evt_xy[0,1]+global_att_radec[1]
+            evt_detr = pow(pow(evt_x-src_ra,2)+pow(evt_y-src_dec,2),0.5)
 
         if evt_pi<energy_range[0]: continue
         if evt_pi>=energy_range[1]: continue
@@ -320,8 +406,9 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
         spectrum_array.fill(evt_pi)
         detx_array.fill(evt_detx)
         image_array.fill(evt_detx,evt_dety)
+        detr_array.fill(evt_detr)
 
-    return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array]
+    return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array, detr_array]
 
 def fit_pattern(data_pattern,xray_pattern,spf_pattern,qpb_pattern):
 
@@ -392,43 +479,11 @@ start_time = time.time()
 
 map_color = 'coolwarm'
 
-#detector = 'mos1S001'
-detector = 'mos2S002'
-
 
 SP_flare_mask = True
 #point_source_mask = True
 #SP_flare_mask = False
 point_source_mask = False
-
-on_sample = sys.argv[1]
-on_obsID = sys.argv[2]
-#on_sample = 'extragalactic'
-#on_obsID = 'ID0505460501' # Percentage of flaring time: 60%
-#on_sample = 'extragalactic'
-#on_obsID = 'ID0820560101' # Percentage of flaring time: 48.8%
-#on_sample = 'extragalactic'
-#on_obsID = 'ID0803160301' # Percentage of flaring time: 28.4%
-#on_sample = 'extragalactic'
-#on_obsID = 'ID0827241101' # Percentage of flaring time: 15.2%
-#on_sample = 'extragalactic'
-#on_obsID = 'ID0827200401' # Percentage of flaring time: 11.9%
-#on_sample = 'extragalactic'
-#on_obsID = 'ID0827200501' # Percentage of flaring time: 6%
-
-#on_sample = 'extragalactic'
-#on_obsID = 'ID0827251101' # Percentage of flaring time: 0.0%
-
-#on_sample = 'RX_J1241.5_p3250'
-#on_obsID = 'ID0056020901' # Percentage of flaring time: %
-#on_sample = 'RX_J0256.5_p0006'
-#on_obsID = 'ID0056020301' # Percentage of flaring time: 60.0%
-#on_sample = 'RX_J1713.7_m3941'
-#on_obsID = 'ID0093670301'
-#on_sample = 'Cas_A'
-#on_obsID = 'ID0412180101'
-#on_sample = '3HWC_J1928_p178'
-#on_obsID = 'ID0902120101'
 
 off_sample = 'extragalactic'
 off_obsID = 'ID0827241101' # Percentage of flaring time: 15.2%
@@ -502,7 +557,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     print ('apply x-ray sample space and time masks')
     
     output_sci_source = read_event_file(xray_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto source',energy_range=energy_range,ccd_id=0)
-    output_sci_ring = read_event_file(xray_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto ring',energy_range=energy_range,ccd_id=0)
+    output_sci_ring   = read_event_file(xray_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto ring',energy_range=energy_range,ccd_id=0)
     
     xray_duration_sci_source = output_sci_source[0]
     xray_evt_count_sci_source = output_sci_source[1]
@@ -805,6 +860,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_spectrum_sci_fov = output_sci_fov[4]
     on_detx_sci_fov = output_sci_fov[5]
     on_image_sci_fov = output_sci_fov[6]
+    on_detr_sci_fov = output_sci_fov[7]
     
     on_duration_sci_cor = output_sci_cor[0]
     on_evt_count_sci_cor = output_sci_cor[1]
@@ -824,6 +880,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_spectrum_fwc_fov = output_fwc_fov[4]
     on_detx_fwc_fov = output_fwc_fov[5]
     on_image_fwc_fov = output_fwc_fov[6]
+    on_detr_fwc_fov = output_fwc_fov[7]
     
     on_duration_fwc_cor = output_fwc_cor[0]
     on_evt_count_fwc_cor = output_fwc_cor[1]
@@ -976,19 +1033,32 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     qpb_detx_template.add(on_detx_fwc_fov)
     sp_detx_template = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
     sp_detx_template.add(on_detx_fwc_fov)
+    qpb_detr_template = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
+    qpb_detr_template.add(on_detr_fwc_fov)
+    sp_detr_template = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
+    sp_detr_template.add(on_detr_fwc_fov)
     qpb_image_template = MyArray2D()
     qpb_image_template.add(on_image_fwc_fov)
     sp_image_template = MyArray2D()
     sp_image_template.add(on_image_fwc_fov)
 
-    qpb_detx_template.scale(qpb_spectrum_template.integral()/qpb_detx_template.integral())
-    sp_detx_template.scale(sp_spectrum_template.integral()/sp_detx_template.integral())
+    qpb_template_scaling = qpb_spectrum_template.integral()/qpb_detx_template.integral()
+    sp_template_scaling = sp_spectrum_template.integral()/sp_detx_template.integral()
+
+    qpb_detx_template.scale(qpb_template_scaling)
+    sp_detx_template.scale(sp_template_scaling)
     on_detx_sci_fov_bkg = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
     on_detx_sci_fov_bkg.add(sp_detx_template)
     on_detx_sci_fov_bkg.add(qpb_detx_template)
     
-    qpb_image_template.scale(qpb_spectrum_template.integral()/qpb_image_template.integral())
-    sp_image_template.scale(sp_spectrum_template.integral()/sp_image_template.integral())
+    qpb_detr_template.scale(qpb_template_scaling)
+    sp_detr_template.scale(sp_template_scaling)
+    on_detr_sci_fov_bkg = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
+    on_detr_sci_fov_bkg.add(sp_detr_template)
+    on_detr_sci_fov_bkg.add(qpb_detr_template)
+    
+    qpb_image_template.scale(qpb_template_scaling)
+    sp_image_template.scale(sp_template_scaling)
     on_image_sci_fov_bkg = MyArray2D()
     on_image_sci_fov_bkg.add(sp_image_template)
     on_image_sci_fov_bkg.add(qpb_image_template)
@@ -1005,6 +1075,18 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_xlabel('DETX')
         axbig.legend(loc='best')
         fig.savefig("../output_plots/detx_on_fit_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        axbig.remove()
+        
+        axbig = fig.add_subplot()
+        axbig.errorbar(on_detr_sci_fov.xaxis,on_detr_sci_fov.yaxis,yerr=on_detr_sci_fov.yerr,color='k',label='Data')
+        axbig.plot(on_detr_sci_fov_bkg.xaxis,on_detr_sci_fov_bkg.yaxis,color='red',label='Bkg')
+        axbig.plot(sp_detr_template.xaxis,sp_detr_template.yaxis,label='SP')
+        axbig.plot(qpb_detr_template.xaxis,qpb_detr_template.yaxis,label='QPB')
+        axbig.set_yscale('log')
+        axbig.set_ylim(bottom=1)
+        axbig.set_xlabel('DETR')
+        axbig.legend(loc='best')
+        fig.savefig("../output_plots/detr_on_fit_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
         
         
@@ -1056,8 +1138,9 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     output_spectrum = [on_spectrum_sci_fov,on_spectrum_sci_fov_bkg,sp_spectrum_template,qpb_spectrum_template]
     output_detx = [on_detx_sci_fov,on_detx_sci_fov_bkg,sp_detx_template,qpb_detx_template]
+    output_detr = [on_detr_sci_fov,on_detr_sci_fov_bkg,sp_detr_template,qpb_detr_template]
 
-    return output_spectrum, output_detx
+    return output_spectrum, output_detx, output_detr
 
 
 on_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
@@ -1070,9 +1153,14 @@ bkg_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_s
 qpb_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
 sp_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
 
+on_detr_sum = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
+bkg_detr_sum = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
+qpb_detr_sum = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
+sp_detr_sum = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
+
 for eng in range(0,len(energy_array)-1):
     for ccd in range(0,len(ana_ccd_bins)):
-        ana_output_spectrum, ana_output_detx = analyze_a_ccd_chip(energy_range=[energy_array[eng],energy_array[eng+1]],ccd_id=ana_ccd_bins[ccd])
+        ana_output_spectrum, ana_output_detx, ana_output_detr = analyze_a_ccd_chip(energy_range=[energy_array[eng],energy_array[eng+1]],ccd_id=ana_ccd_bins[ccd])
         on_spectrum_sum.add(ana_output_spectrum[0])
         bkg_spectrum_sum.add(ana_output_spectrum[1])
         sp_spectrum_sum.add(ana_output_spectrum[2])
@@ -1081,6 +1169,10 @@ for eng in range(0,len(energy_array)-1):
         bkg_detx_sum.add(ana_output_detx[1])
         sp_detx_sum.add(ana_output_detx[2])
         qpb_detx_sum.add(ana_output_detx[3])
+        on_detr_sum.add(ana_output_detr[0])
+        bkg_detr_sum.add(ana_output_detr[1])
+        sp_detr_sum.add(ana_output_detr[2])
+        qpb_detr_sum.add(ana_output_detr[3])
 
 fig.clf()
 axbig = fig.add_subplot()
@@ -1105,6 +1197,19 @@ axbig.set_ylim(bottom=1)
 axbig.set_xlabel('DETX')
 axbig.legend(loc='best')
 fig.savefig("../output_plots/detx_on_fit_sum_%s.png"%(plot_tag),bbox_inches='tight')
+axbig.remove()
+
+fig.clf()
+axbig = fig.add_subplot()
+axbig.errorbar(on_detr_sum.xaxis,on_detr_sum.yaxis,yerr=on_detr_sum.yerr,color='k',label='Data')
+axbig.plot(bkg_detr_sum.xaxis,bkg_detr_sum.yaxis,color='red',label='Bkg')
+axbig.plot(sp_detr_sum.xaxis,sp_detr_sum.yaxis,label='SP')
+axbig.plot(qpb_detr_sum.xaxis,qpb_detr_sum.yaxis,label='QPB')
+axbig.set_yscale('log')
+axbig.set_ylim(bottom=1)
+axbig.set_xlabel('R')
+axbig.legend(loc='best')
+fig.savefig("../output_plots/detr_on_fit_sum_%s.png"%(plot_tag),bbox_inches='tight')
 axbig.remove()
 
 
