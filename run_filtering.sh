@@ -55,8 +55,9 @@ mv $mos2_gti mos2S002-gti-loose.fits
 # select FoV events
 #em_fov_cut='(PATTERN<=12)&&(PI in ['$ELOW':'$EHIGH'])&&(FLAG & 0x766ba000)==0'
 em_fov_cut='(PI in ['$ELOW':'$EHIGH'])&&(FLAG & 0x766ba000)==0'
-evselect table=mos1S001.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos1S001-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-evselect table=mos2S002.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos2S002-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
+evselect table=mos1S001.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos1S001-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes imageset=mos1S001-fov-img.fits 
+evselect table=mos2S002.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos2S002-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes imageset=mos2S002-fov-img.fits 
+
 
 # select corner events
 #em_cor_cut='(PATTERN<=12)&&(PI in ['$ELOW':'$EHIGH'])&&((FLAG & 0x766aa000)==0)&&((FLAG & 0x766ba000)!=0)'
@@ -64,21 +65,6 @@ em_cor_cut='(PI in ['$ELOW':'$EHIGH'])&&((FLAG & 0x766aa000)==0)&&((FLAG & 0x766
 evselect table=mos1S001.fits withfilteredset=yes filtertype=expression expression="$em_cor_cut" filteredset=mos1S001-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 evselect table=mos2S002.fits withfilteredset=yes filtertype=expression expression="$em_cor_cut" filteredset=mos2S002-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 
-## remove soft-proton events
-#sp_gti_veto='GTI(mos1S001-gti-tight.fits,TIME)'
-#evselect table=mos1S001-fov-evt.fits withfilteredset=yes filtertype=expression expression="$sp_gti_veto" filteredset=mos1S001-sci-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-#evselect table=mos1S001-cor-evt.fits withfilteredset=yes filtertype=expression expression="$sp_gti_veto" filteredset=mos1S001-sci-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-#sp_gti_veto='GTI(mos2S002-gti-tight.fits,TIME)'
-#evselect table=mos2S002-fov-evt.fits withfilteredset=yes filtertype=expression expression="$sp_gti_veto" filteredset=mos2S002-sci-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-#evselect table=mos2S002-cor-evt.fits withfilteredset=yes filtertype=expression expression="$sp_gti_veto" filteredset=mos2S002-sci-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-#
-## select soft-proton events
-#sp_gti_select='(!GTI(mos1S001-gti-loose.fits,TIME))'
-#evselect table=mos1S001-fov-evt.fits withfilteredset=yes filtertype=expression expression="$sp_gti_select" filteredset=mos1S001-spf-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-#evselect table=mos1S001-cor-evt.fits withfilteredset=yes filtertype=expression expression="$sp_gti_select" filteredset=mos1S001-spf-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-#sp_gti_select='(!GTI(mos2S002-gti-loose.fits,TIME))'
-#evselect table=mos2S002-fov-evt.fits withfilteredset=yes filtertype=expression expression="$sp_gti_select" filteredset=mos2S002-spf-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-#evselect table=mos2S002-cor-evt.fits withfilteredset=yes filtertype=expression expression="$sp_gti_select" filteredset=mos2S002-spf-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 
 
 # make the attitude file
@@ -99,9 +85,6 @@ evselect table=mos1S001-fwc-evt.fits withfilteredset=yes filtertype=expression e
 evselect table=mos2S002-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_cor_cut" filteredset=mos2S002-fwc-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 
 
-#em_qpb_cut='(PATTERN>12)&&(PI in ['$ELOW':'$EHIGH'])'
-#evselect table=mos1S001.fits withfilteredset=yes filtertype=expression expression="$em_qpb_cut" filteredset=mos1S001-qpbevc.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-#evselect table=mos2S002.fits withfilteredset=yes filtertype=expression expression="$em_qpb_cut" filteredset=mos2S002-qpbevc.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 
 # to view the image
 # imgdisplay withimagefile=true imagefile=mos1image_src_filt.fits

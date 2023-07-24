@@ -34,14 +34,17 @@ diagnostic_plots = False
 #detector = 'mos1S001'
 detector = 'mos2S002'
 
-energy_array = [2000,3000,5000,8000,12000]
-#energy_array = [2000,12000]
-ana_ccd_bins = [1,2,3,4,5,6,7]
-#ana_ccd_bins = [0]
+#on_filter = ''
+on_filter = 'halo'
+
+#energy_array = [2000,3000,5000,8000,12000]
+energy_array = [2000,12000]
+#ana_ccd_bins = [1,2,3,4,5,6,7]
+ana_ccd_bins = [0]
 
 ch_low = 200
 ch_high = 12000
-ch_scale = 200
+ch_scale = 100
 t_low = 0
 t_high = 1
 t_scale = 0.05
@@ -51,12 +54,25 @@ detx_scale = 500
 detr_low = 0
 detr_high = 20000
 detr_scale = 500
+sky_ra_low = 0
+sky_ra_high = 0.5
+sky_dec_low = 0
+sky_dec_high = 0.5
+sky_scale = 0.001
 
 src_ra = 0
 src_dec = 0
 if 'Cas_A' in on_sample:
-    src_ra = 350.85
-    src_dec = 58.84
+    #src_ra = 350.8500000
+    #src_dec = 58.8150000
+    src_ra = 350.95
+    src_dec = 58.71
+
+src_detx = 0
+src_dety = 0
+if 'ID0400210101' in on_obsID:
+    src_detx = 13000
+    src_dety = 13000
 
 def get_conversion_mtx():
     radec_filename = '../%s/%s/analysis/pointing_coord.txt'%(on_sample,on_obsID)
@@ -114,16 +130,25 @@ if not 'extragalactic' in on_sample:
     #detr_high = pow(pow(src_ra-global_att_radec[0],2)+pow(src_dec-global_att_radec[1],2),0.5)+20000*pix_size
     detr_high = detr_low+60000*pix_size
     detr_scale = detr_scale*pix_size
+    sky_ra_low = global_att_radec[0]-0.25
+    sky_ra_high = global_att_radec[0]+0.25
+    sky_dec_low = global_att_radec[1]-0.25
+    sky_dec_high = global_att_radec[1]+0.25
 
 fwc_2_sci_ratio = 0.4
 
 class MyArray2D:
 
-    def __init__(self):
+    def __init__(self,coord='det'):
         start_x = -19474.5
         start_y = -19474.5
-        pixel_scale = 500
+        pixel_scale = 200
         image_size = 39000
+        if coord=='radec':
+            start_x = sky_ra_low
+            start_y = sky_dec_low
+            pixel_scale = sky_scale
+            image_size = 0.5
         nrows = int(image_size/pixel_scale)
         ncols = int(image_size/pixel_scale)
         array_shape = (nrows,ncols)
@@ -315,7 +340,7 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
     spectrum_array = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     detx_array = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
     image_array = MyArray2D()
-    detr_array = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
+    image_sky_array = MyArray2D(coord='radec')
 
     time_start = events[0]['TIME']
     time_end = events[len(events)-1]['TIME']
@@ -323,7 +348,7 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
 
     for evt in range(0,len(events)):
 
-        if (evt%10)!=0: continue
+        #if (evt%10)!=0: continue
 
         evt_time = events[evt]['TIME']
         evt_pattern = events[evt]['PATTERN']
@@ -331,13 +356,13 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
 
         evt_detx = events[evt]['DETX']
         evt_dety = events[evt]['DETY']
-        evt_detr = pow(pow(evt_detx,2)+pow(evt_dety,2),0.5)
+        evt_x = 0.
+        evt_y = 0.
         if not 'extragalactic' in on_sample:
             evt_detxy = np.array([evt_detx,evt_dety])
             evt_xy = np.matmul(global_mtx_conv_det_2_sky,evt_detxy)
             evt_x = evt_xy[0,0]+global_att_radec[0]
             evt_y = evt_xy[0,1]+global_att_radec[1]
-            evt_detr = pow(pow(evt_x-src_ra,2)+pow(evt_y-src_dec,2),0.5)
 
         if evt_pi<energy_range[0]: continue
         if evt_pi>=energy_range[1]: continue
@@ -362,13 +387,19 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
             #if abs(evt_dety)>1000: continue
             if abs(evt_detx)>6000: continue
             if abs(evt_dety)>6000: continue
-        if 'ring' in evt_filter:
+        elif 'ring' in evt_filter:
             #if abs(evt_detx)<1500 and abs(evt_dety)<1500: continue
             #if abs(evt_detx)>6000: continue
             #if abs(evt_dety)>6000: continue
             if abs(evt_detx)<6000 and abs(evt_dety)<6000: continue
             if abs(evt_detx)>12000: continue
             if abs(evt_dety)>12000: continue
+        elif 'halo' in evt_filter:
+            #distance = pow(pow(evt_x-src_ra,2)+pow(evt_y-src_dec,2),0.5)
+            #if distance<0.06: continue
+            distance = pow(pow(evt_detx-src_detx,2)+pow(evt_dety-src_dety,2),0.5)
+            if distance<6000: continue
+            if distance>12000: continue
 
         if not mask_lc==None:
             zscore = mask_lc.get_bin_content((evt_time-time_start)/(time_end-time_start))
@@ -406,9 +437,9 @@ def read_event_file(filename,mask_lc=None,mask_map=None,evt_filter='',energy_ran
         spectrum_array.fill(evt_pi)
         detx_array.fill(evt_detx)
         image_array.fill(evt_detx,evt_dety)
-        detr_array.fill(evt_detr)
+        image_sky_array.fill(evt_x,evt_y)
 
-    return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array, detr_array]
+    return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array, image_sky_array]
 
 def fit_pattern(data_pattern,xray_pattern,spf_pattern,qpb_pattern):
 
@@ -496,7 +527,7 @@ off_obsID = 'ID0827241101' # Percentage of flaring time: 15.2%
 xray_sample = 'Cas_A'
 xray_obsID = 'ID0412180101'
 
-plot_tag = detector+'_'+on_obsID
+plot_tag = detector+'_'+on_filter+'_'+on_obsID
 
 xray_sci_fov_evt_filename = '../%s/%s/analysis/%s-fov-evt.fits'%(xray_sample,xray_obsID,detector)
 xray_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-fov-evt.fits'%(xray_sample,xray_obsID,detector)
@@ -850,7 +881,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('apply space and time masks')
     
-    output_sci_fov = read_event_file(on_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    output_sci_fov = read_event_file(on_sci_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto '+on_filter,energy_range=energy_range,ccd_id=ccd_id)
     output_sci_cor = read_event_file(on_sci_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
     
     on_duration_sci_fov = output_sci_fov[0]
@@ -860,7 +891,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_spectrum_sci_fov = output_sci_fov[4]
     on_detx_sci_fov = output_sci_fov[5]
     on_image_sci_fov = output_sci_fov[6]
-    on_detr_sci_fov = output_sci_fov[7]
+    on_image_sky_sci_fov = output_sci_fov[7]
     
     on_duration_sci_cor = output_sci_cor[0]
     on_evt_count_sci_cor = output_sci_cor[1]
@@ -870,7 +901,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_detx_sci_cor = output_sci_cor[5]
     on_image_sci_cor = output_sci_cor[6]
     
-    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter=''+on_filter,energy_range=energy_range,ccd_id=ccd_id)
     output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
     
     on_duration_fwc_fov = output_fwc_fov[0]
@@ -880,7 +911,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_spectrum_fwc_fov = output_fwc_fov[4]
     on_detx_fwc_fov = output_fwc_fov[5]
     on_image_fwc_fov = output_fwc_fov[6]
-    on_detr_fwc_fov = output_fwc_fov[7]
+    on_image_sky_fwc_fov = output_fwc_fov[7]
     
     on_duration_fwc_cor = output_fwc_cor[0]
     on_evt_count_fwc_cor = output_fwc_cor[1]
@@ -1033,10 +1064,10 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     qpb_detx_template.add(on_detx_fwc_fov)
     sp_detx_template = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
     sp_detx_template.add(on_detx_fwc_fov)
-    qpb_detr_template = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
-    qpb_detr_template.add(on_detr_fwc_fov)
-    sp_detr_template = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
-    sp_detr_template.add(on_detr_fwc_fov)
+    qpb_image_sky_template = MyArray2D(coord='radec')
+    qpb_image_sky_template.add(on_image_sky_fwc_fov)
+    sp_image_sky_template = MyArray2D(coord='radec')
+    sp_image_sky_template.add(on_image_sky_fwc_fov)
     qpb_image_template = MyArray2D()
     qpb_image_template.add(on_image_fwc_fov)
     sp_image_template = MyArray2D()
@@ -1051,11 +1082,11 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_detx_sci_fov_bkg.add(sp_detx_template)
     on_detx_sci_fov_bkg.add(qpb_detx_template)
     
-    qpb_detr_template.scale(qpb_template_scaling)
-    sp_detr_template.scale(sp_template_scaling)
-    on_detr_sci_fov_bkg = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
-    on_detr_sci_fov_bkg.add(sp_detr_template)
-    on_detr_sci_fov_bkg.add(qpb_detr_template)
+    qpb_image_sky_template.scale(qpb_template_scaling)
+    sp_image_sky_template.scale(sp_template_scaling)
+    on_image_sky_sci_fov_bkg = MyArray2D(coord='radec')
+    on_image_sky_sci_fov_bkg.add(sp_image_sky_template)
+    on_image_sky_sci_fov_bkg.add(qpb_image_sky_template)
     
     qpb_image_template.scale(qpb_template_scaling)
     sp_image_template.scale(sp_template_scaling)
@@ -1076,19 +1107,6 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.legend(loc='best')
         fig.savefig("../output_plots/detx_on_fit_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
-        
-        axbig = fig.add_subplot()
-        axbig.errorbar(on_detr_sci_fov.xaxis,on_detr_sci_fov.yaxis,yerr=on_detr_sci_fov.yerr,color='k',label='Data')
-        axbig.plot(on_detr_sci_fov_bkg.xaxis,on_detr_sci_fov_bkg.yaxis,color='red',label='Bkg')
-        axbig.plot(sp_detr_template.xaxis,sp_detr_template.yaxis,label='SP')
-        axbig.plot(qpb_detr_template.xaxis,qpb_detr_template.yaxis,label='QPB')
-        axbig.set_yscale('log')
-        axbig.set_ylim(bottom=1)
-        axbig.set_xlabel('DETR')
-        axbig.legend(loc='best')
-        fig.savefig("../output_plots/detr_on_fit_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
-        axbig.remove()
-        
         
         fig.clf()
         axbig = fig.add_subplot()
@@ -1138,9 +1156,10 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     output_spectrum = [on_spectrum_sci_fov,on_spectrum_sci_fov_bkg,sp_spectrum_template,qpb_spectrum_template]
     output_detx = [on_detx_sci_fov,on_detx_sci_fov_bkg,sp_detx_template,qpb_detx_template]
-    output_detr = [on_detr_sci_fov,on_detr_sci_fov_bkg,sp_detr_template,qpb_detr_template]
+    output_image_sky = [on_image_sky_sci_fov,on_image_sky_sci_fov_bkg,sp_image_sky_template,qpb_image_sky_template]
+    output_image = [on_image_sci_fov,on_image_sci_fov_bkg,sp_image_template,qpb_image_template]
 
-    return output_spectrum, output_detx, output_detr
+    return output_spectrum, output_detx, output_image_sky, output_image
 
 
 on_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
@@ -1153,14 +1172,21 @@ bkg_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_s
 qpb_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
 sp_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
 
-on_detr_sum = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
-bkg_detr_sum = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
-qpb_detr_sum = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
-sp_detr_sum = MyArray1D(bin_start=detr_low,bin_end=detr_high,pixel_scale=detr_scale)
+excess_image_sky_sum = MyArray2D(coord='radec')
+on_image_sky_sum = MyArray2D(coord='radec')
+bkg_image_sky_sum = MyArray2D(coord='radec')
+qpb_image_sky_sum = MyArray2D(coord='radec')
+sp_image_sky_sum = MyArray2D(coord='radec')
+
+excess_image_sum = MyArray2D()
+on_image_sum = MyArray2D()
+bkg_image_sum = MyArray2D()
+qpb_image_sum = MyArray2D()
+sp_image_sum = MyArray2D()
 
 for eng in range(0,len(energy_array)-1):
     for ccd in range(0,len(ana_ccd_bins)):
-        ana_output_spectrum, ana_output_detx, ana_output_detr = analyze_a_ccd_chip(energy_range=[energy_array[eng],energy_array[eng+1]],ccd_id=ana_ccd_bins[ccd])
+        ana_output_spectrum, ana_output_detx, ana_output_image_sky, ana_output_image = analyze_a_ccd_chip(energy_range=[energy_array[eng],energy_array[eng+1]],ccd_id=ana_ccd_bins[ccd])
         on_spectrum_sum.add(ana_output_spectrum[0])
         bkg_spectrum_sum.add(ana_output_spectrum[1])
         sp_spectrum_sum.add(ana_output_spectrum[2])
@@ -1169,10 +1195,19 @@ for eng in range(0,len(energy_array)-1):
         bkg_detx_sum.add(ana_output_detx[1])
         sp_detx_sum.add(ana_output_detx[2])
         qpb_detx_sum.add(ana_output_detx[3])
-        on_detr_sum.add(ana_output_detr[0])
-        bkg_detr_sum.add(ana_output_detr[1])
-        sp_detr_sum.add(ana_output_detr[2])
-        qpb_detr_sum.add(ana_output_detr[3])
+        on_image_sky_sum.add(ana_output_image_sky[0])
+        bkg_image_sky_sum.add(ana_output_image_sky[1])
+        sp_image_sky_sum.add(ana_output_image_sky[2])
+        qpb_image_sky_sum.add(ana_output_image_sky[3])
+        on_image_sum.add(ana_output_image[0])
+        bkg_image_sum.add(ana_output_image[1])
+        sp_image_sum.add(ana_output_image[2])
+        qpb_image_sum.add(ana_output_image[3])
+
+excess_image_sum.add(on_image_sum)
+excess_image_sum.add(bkg_image_sum,-1.)
+excess_image_sky_sum.add(on_image_sky_sum)
+excess_image_sky_sum.add(bkg_image_sky_sum,-1.)
 
 fig.clf()
 axbig = fig.add_subplot()
@@ -1181,6 +1216,7 @@ axbig.plot(bkg_spectrum_sum.xaxis,bkg_spectrum_sum.yaxis,color='red',label='Bkg'
 axbig.plot(sp_spectrum_sum.xaxis,sp_spectrum_sum.yaxis,label='SP')
 axbig.plot(qpb_spectrum_sum.xaxis,qpb_spectrum_sum.yaxis,label='QPB')
 axbig.set_yscale('log')
+axbig.set_ylim(bottom=1)
 axbig.set_xlabel('Channel')
 axbig.legend(loc='best')
 fig.savefig("../output_plots/spectrum_on_fit_sum_%s.png"%(plot_tag),bbox_inches='tight')
@@ -1201,17 +1237,31 @@ axbig.remove()
 
 fig.clf()
 axbig = fig.add_subplot()
-axbig.errorbar(on_detr_sum.xaxis,on_detr_sum.yaxis,yerr=on_detr_sum.yerr,color='k',label='Data')
-axbig.plot(bkg_detr_sum.xaxis,bkg_detr_sum.yaxis,color='red',label='Bkg')
-axbig.plot(sp_detr_sum.xaxis,sp_detr_sum.yaxis,label='SP')
-axbig.plot(qpb_detr_sum.xaxis,qpb_detr_sum.yaxis,label='QPB')
-axbig.set_yscale('log')
-axbig.set_ylim(bottom=1)
-axbig.set_xlabel('R')
-axbig.legend(loc='best')
-fig.savefig("../output_plots/detr_on_fit_sum_%s.png"%(plot_tag),bbox_inches='tight')
+label_x = 'DETY'
+label_y = 'DETX'
+axbig.set_xlabel(label_x)
+axbig.set_ylabel(label_y)
+xmin = on_image_sum.xaxis.min()
+xmax = on_image_sum.xaxis.max()
+ymin = on_image_sum.yaxis.min()
+ymax = on_image_sum.yaxis.max()
+axbig.imshow(excess_image_sum.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+fig.savefig("../output_plots/image_det_sum_%s.png"%(plot_tag),bbox_inches='tight')
 axbig.remove()
 
+fig.clf()
+axbig = fig.add_subplot()
+label_x = 'RA'
+label_y = 'Dec'
+axbig.set_xlabel(label_x)
+axbig.set_ylabel(label_y)
+xmin = on_image_sky_sum.xaxis.min()
+xmax = on_image_sky_sum.xaxis.max()
+ymin = on_image_sky_sum.yaxis.min()
+ymax = on_image_sky_sum.yaxis.max()
+axbig.imshow(excess_image_sky_sum.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+fig.savefig("../output_plots/image_sky_sum_%s.png"%(plot_tag),bbox_inches='tight')
+axbig.remove()
 
 
 

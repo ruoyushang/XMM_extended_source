@@ -1,11 +1,26 @@
 
-cd /Users/rshang/xmm_analysis/extragalactic/ID0827251001
+cd /Users/rshang/xmm_analysis/extragalactic/ID0505460501
+#cd /Users/rshang/xmm_analysis/extragalactic/ID0690900101
+#cd /Users/rshang/xmm_analysis/extragalactic/ID0803160301
+#cd /Users/rshang/xmm_analysis/extragalactic/ID0820560101
+#cd /Users/rshang/xmm_analysis/extragalactic/ID0827200401
+#cd /Users/rshang/xmm_analysis/extragalactic/ID0827200501
+#cd /Users/rshang/xmm_analysis/extragalactic/ID0827241101
+#cd /Users/rshang/xmm_analysis/extragalactic/ID0827251001
+#cd /Users/rshang/xmm_analysis/extragalactic/ID0827251101
 #
+#cd /Users/rshang/xmm_analysis/MGRO_J1908_p06/ID0553640201
 #cd /Users/rshang/xmm_analysis/RX_J1241.5_p3250/ID0056020901
 #cd /Users/rshang/xmm_analysis/RX_J0256.5_p0006/ID0056020301
 #cd /Users/rshang/xmm_analysis/RX_J1713.7_m3941/ID0093670301
-#cd /Users/rshang/xmm_analysis/Cas_A/ID0412180101
 #cd /Users/rshang/xmm_analysis/3HWC_J1928_p178/ID0902120101
+#
+#cd /Users/rshang/xmm_analysis/Cas_A/ID0400210101
+#cd /Users/rshang/xmm_analysis/Cas_A/ID0412180101
+#cd /Users/rshang/xmm_analysis/Cas_A/ID0764640101
+#cd /Users/rshang/xmm_analysis/Cas_A/ID0782961401
+
+
 
 cp /Users/rshang/xmm_analysis/analysis_code/*.sh .
 cp /Users/rshang/xmm_analysis/analysis_code/*.py .
@@ -22,6 +37,9 @@ cp /Users/rshang/xmm_analysis/analysis_code/*.py .
 #sh run_rename.sh
 
 sh run_filtering.sh
+python3 run_pointing_radec.py
+sh run_create_regions.sh
+sh run_response.sh
 #
 #sh run_src_detect.sh
 
