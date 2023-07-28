@@ -17,9 +17,9 @@ sh clean_plots.sh
 #python3 xmm_extended_source_analysis.py 'RX_J0256.5_p0006' 'ID0056020301'
 #python3 xmm_extended_source_analysis.py 'RX_J1713.7_m3941' 'ID0093670301'
 #python3 xmm_extended_source_analysis.py 'MGRO_J1908_p06' 'ID0553640201'
-#python3 xmm_extended_source_analysis.py '3HWC_J1928_p178' 'ID0902120101'
+python3 xmm_extended_source_analysis.py '3HWC_J1928_p178' 'ID0902120101'
 #
-python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0412180101'
+#python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0412180101'
 #python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0400210101' # Cas A Northern lobe
 #python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
 #python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0764640101' # angular distance to Cas A: 144.51 arcmin

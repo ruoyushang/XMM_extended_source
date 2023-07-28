@@ -21,31 +21,31 @@ cd analysis/
 # mos2S002-allevc.fits
 # pnS003-allevc.fits
 
-rm mos1S001-*.fits
-rm mos1S001-*.qdp
-rm mos2S002-*.fits
-rm mos2S002-*.qdp
+rm mos1-*.fits
+rm mos1-*.qdp
+rm mos2-*.fits
+rm mos2-*.qdp
 
-espfilt eventfile=mos1S001.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=1.5 method=histogram keepinterfiles=false
-espfilt eventfile=mos2S002.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=1.5 method=histogram keepinterfiles=false
+espfilt eventfile=mos1.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=1.5 method=histogram keepinterfiles=false
+espfilt eventfile=mos2.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=1.5 method=histogram keepinterfiles=false
 mos1_gti=$(ls mos1*-gti.fits)
 mos2_gti=$(ls mos2*-gti.fits)
-mv $mos1_gti mos1S001-gti-tight.fits
-mv $mos2_gti mos2S002-gti-tight.fits
+mv $mos1_gti mos1-gti-tight.fits
+mv $mos2_gti mos2-gti-tight.fits
 
-espfilt eventfile=mos1S001.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=2.5 method=histogram keepinterfiles=false
-espfilt eventfile=mos2S002.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=2.5 method=histogram keepinterfiles=false
+espfilt eventfile=mos1.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=2.5 method=histogram keepinterfiles=false
+espfilt eventfile=mos2.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=2.5 method=histogram keepinterfiles=false
 mos1_gti=$(ls mos1*-gti.fits)
 mos2_gti=$(ls mos2*-gti.fits)
-mv $mos1_gti mos1S001-gti-medium.fits
-mv $mos2_gti mos2S002-gti-medium.fits
+mv $mos1_gti mos1-gti-medium.fits
+mv $mos2_gti mos2-gti-medium.fits
 
-espfilt eventfile=mos1S001.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=3.5 method=histogram keepinterfiles=false
-espfilt eventfile=mos2S002.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=3.5 method=histogram keepinterfiles=false
+espfilt eventfile=mos1.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=3.5 method=histogram keepinterfiles=false
+espfilt eventfile=mos2.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=6.0 allowsigma=3.5 method=histogram keepinterfiles=false
 mos1_gti=$(ls mos1*-gti.fits)
 mos2_gti=$(ls mos2*-gti.fits)
-mv $mos1_gti mos1S001-gti-loose.fits
-mv $mos2_gti mos2S002-gti-loose.fits
+mv $mos1_gti mos1-gti-loose.fits
+mv $mos2_gti mos2-gti-loose.fits
 
 #espfilt eventfile=pnS003.fits elow=$ELOW ehigh=$EHIGH withsmoothing=yes smooth=51 rangescale=15.0 allowsigma=3.0 method=histogram withoot=Y ootfile=pnS003-oot.fits keepinterfiles=false
 
@@ -55,15 +55,15 @@ mv $mos2_gti mos2S002-gti-loose.fits
 # select FoV events
 #em_fov_cut='(PATTERN<=12)&&(PI in ['$ELOW':'$EHIGH'])&&(FLAG & 0x766ba000)==0'
 em_fov_cut='(PI in ['$ELOW':'$EHIGH'])&&(FLAG & 0x766ba000)==0'
-evselect table=mos1S001.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos1S001-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes imageset=mos1S001-fov-img.fits 
-evselect table=mos2S002.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos2S002-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes imageset=mos2S002-fov-img.fits 
+evselect table=mos1.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos1-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes 
+evselect table=mos2.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos2-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 
 
 # select corner events
 #em_cor_cut='(PATTERN<=12)&&(PI in ['$ELOW':'$EHIGH'])&&((FLAG & 0x766aa000)==0)&&((FLAG & 0x766ba000)!=0)'
 em_cor_cut='(PI in ['$ELOW':'$EHIGH'])&&((FLAG & 0x766aa000)==0)&&((FLAG & 0x766ba000)!=0)'
-evselect table=mos1S001.fits withfilteredset=yes filtertype=expression expression="$em_cor_cut" filteredset=mos1S001-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-evselect table=mos2S002.fits withfilteredset=yes filtertype=expression expression="$em_cor_cut" filteredset=mos2S002-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
+evselect table=mos1.fits withfilteredset=yes filtertype=expression expression="$em_cor_cut" filteredset=mos1-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
+evselect table=mos2.fits withfilteredset=yes filtertype=expression expression="$em_cor_cut" filteredset=mos2-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 
 
 
@@ -71,18 +71,18 @@ evselect table=mos2S002.fits withfilteredset=yes filtertype=expression expressio
 atthkgen atthkset=attitude.fits timestep=1
 
 # select cosmic-ray events
-evqpb table=mos1S001.fits attfile=attitude.fits outset=mos1S001-fwc-evt.fits
-evqpb table=mos2S002.fits attfile=attitude.fits outset=mos2S002-fwc-evt.fits
+evqpb table=mos1.fits attfile=attitude.fits outset=mos1-fwc-evt.fits
+evqpb table=mos2.fits attfile=attitude.fits outset=mos2-fwc-evt.fits
 
 # select FoV events
 em_fwc_fov_cut='(PI in ['$ELOW':'$EHIGH'])&&((FLAG & 0x10000)==0)'
-evselect table=mos1S001-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_fov_cut" filteredset=mos1S001-fwc-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-evselect table=mos2S002-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_fov_cut" filteredset=mos2S002-fwc-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
+evselect table=mos1-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_fov_cut" filteredset=mos1-fwc-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
+evselect table=mos2-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_fov_cut" filteredset=mos2-fwc-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 
 # select corner events
 em_fwc_cor_cut='(PI in ['$ELOW':'$EHIGH'])&&((FLAG & 0x10000)!=0)'
-evselect table=mos1S001-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_cor_cut" filteredset=mos1S001-fwc-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-evselect table=mos2S002-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_cor_cut" filteredset=mos2S002-fwc-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
+evselect table=mos1-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_cor_cut" filteredset=mos1-fwc-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
+evselect table=mos2-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_cor_cut" filteredset=mos2-fwc-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 
 
 

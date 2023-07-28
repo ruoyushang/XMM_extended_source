@@ -8,8 +8,8 @@ echo $SAS_ODF
 cd analysis/
 
 
-convregion mode=2 shape=CIRCLE inregion=pointing_coord.txt outregion=det_coord_mos1S001.txt imagefile=mos1S001-fov-img.fits
-convregion mode=2 shape=CIRCLE inregion=pointing_coord.txt outregion=det_coord_mos2S002.txt imagefile=mos2S002-fov-img.fits
+convregion mode=2 shape=CIRCLE inregion=pointing_coord.txt outregion=det_coord_mos1.txt imagefile=mos1-fov-img.fits
+convregion mode=2 shape=CIRCLE inregion=pointing_coord.txt outregion=det_coord_mos2.txt imagefile=mos2-fov-img.fits
 
 # The input file, reg_sky_coord.txt, contains:
 # circle 207.12 26.59 4.0
