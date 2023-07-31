@@ -34,15 +34,15 @@ diagnostic_plots = True
 #detector = 'mos1'
 detector = 'mos2'
 
-#on_filter = 'fov'
+on_filter = 'fov'
 #on_filter = 'reg1'
 #on_filter = 'reg2'
 #on_filter = 'reg3'
-on_filter = 'reg4'
+#on_filter = 'reg4'
 
 energy_array = [2000,4000,6000,8000,10000,12000]
 #energy_array = [2000,3000,5000,8000,12000]
-#energy_array = [2000,12000]
+#energy_array = [10000,12000]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 ana_ccd_bins = [0]
 
@@ -464,39 +464,6 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',e
 
 def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
 
-    sp_free_data = 0.
-    sp_free_xray = 0.
-    sp_free_qpb = 0.
-    for idx in range(0,len(data_pattern[0].xaxis)):
-        if idx!=2: continue
-        if idx>4: continue
-        sp_free_data += data_pattern[0].yaxis[idx]
-        sp_free_xray += xray_pattern[0].yaxis[idx]
-        sp_free_qpb  += qpb_pattern[0].yaxis[idx]
-
-    xray_scale = 0.
-    if sp_free_xray>0.:
-        xray_scale = (sp_free_data-sp_free_qpb)/sp_free_xray
-    xray_scale = max(0.,xray_scale)
-
-    sp_pattern_data = 0.
-    sp_pattern_xray = 0.
-    sp_pattern_qpb = 0.
-    sp_pattern_spf = 0.
-    for idx in range(0,len(data_pattern[0].xaxis)):
-        if idx==2: continue
-        if idx>4: continue
-        sp_pattern_data += data_pattern[0].yaxis[idx]
-        sp_pattern_xray += xray_pattern[0].yaxis[idx]
-        sp_pattern_qpb  += qpb_pattern[0].yaxis[idx]
-        sp_pattern_spf  += spf_pattern[0].yaxis[idx]
-    sp_pattern_xray = sp_pattern_xray*xray_scale
-    
-    sp_scale = 0.
-    if sp_pattern_spf>0.:
-        sp_scale = (sp_pattern_data-sp_pattern_xray-sp_pattern_qpb)/sp_pattern_spf
-    sp_scale = max(0.,sp_scale)
-
 
     # Define the function to minimize (residuals)
     def residuals(A):
@@ -504,35 +471,81 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
         for ch in range(1,len(energy_range)):
             for pattern in range(0,len(data_pattern[ch].yaxis)):
                 data_cnt = data_pattern[ch].yaxis[pattern]
-                xray_model = A[1+ch]*xray_pattern[ch].yaxis[pattern]
+                xray_model = A[2+ch]*xray_pattern[ch].yaxis[pattern]
                 spf_model = A[0]*pow(energy_range[ch-1]/1000.,A[1])*spf_pattern[ch].yaxis[pattern]
-                qpb_model = qpb_pattern[ch].yaxis[pattern]
-                data_error = pow(data_cnt,0.5)
+                qpb_model = A[2]*qpb_pattern[ch].yaxis[pattern]
+                data_error = pow(max(data_cnt,1.),0.5)
                 if data_error==0: continue
                 chi2 += (data_cnt - xray_model - spf_model - qpb_model) / data_error
         return chi2
 
+    sp_scale_list = []
+    xray_scale_list = []
     for ch in range(1,len(energy_range)):
-        data_pattern[ch].get_error()
+        sp_free_data = 0.
+        sp_free_xray = 0.
+        sp_free_qpb = 0.
+        for idx in range(0,len(data_pattern[ch].xaxis)):
+            if idx!=2: continue
+            if idx>4: continue
+            sp_free_data += data_pattern[ch].yaxis[idx]
+            sp_free_xray += xray_pattern[ch].yaxis[idx]
+            sp_free_qpb  += qpb_pattern[ch].yaxis[idx]
+
+        xray_scale = 0.
+        if sp_free_xray>0.:
+            xray_scale = (sp_free_data-sp_free_qpb)/sp_free_xray
+        xray_scale = max(0.,xray_scale)
+
+        sp_pattern_data = 0.
+        sp_pattern_xray = 0.
+        sp_pattern_qpb = 0.
+        sp_pattern_spf = 0.
+        for idx in range(0,len(data_pattern[ch].xaxis)):
+            if idx==2: continue
+            if idx>4: continue
+            sp_pattern_data += data_pattern[ch].yaxis[idx]
+            sp_pattern_xray += xray_pattern[ch].yaxis[idx]
+            sp_pattern_qpb  += qpb_pattern[ch].yaxis[idx]
+            sp_pattern_spf  += spf_pattern[ch].yaxis[idx]
+        sp_pattern_xray = sp_pattern_xray*xray_scale
+        
+        sp_scale = 0.
+        if sp_pattern_spf>0.:
+            sp_scale = (sp_pattern_data-sp_pattern_xray-sp_pattern_qpb)/sp_pattern_spf
+        sp_scale = max(0.,sp_scale)
+
+        sp_scale_list += [sp_scale]
+        xray_scale_list += [xray_scale]
+
+    sp_scale_avg = 0.
+    for ch in range(1,len(energy_range)):
+        sp_scale_avg += sp_scale_list[ch-1]
+    sp_scale_avg = sp_scale_avg/float(len(energy_range)-1)
 
     # Perform the least squares fitting
-    sp_scale = max(sp_scale,0.001)
-    xray_scale = max(xray_scale,0.001)
-    param_init = [sp_scale,0.]
-    param_bound_upper = [10.,1.]
-    param_bound_lower = [0.0001,-1.]
+    sp_scale = max(sp_scale_avg,0.0)
+    qpb_scale = 1.
+    param_init = [sp_scale,0.,qpb_scale]
+    param_bound_upper = [10.,1.,2.0]
+    param_bound_lower = [0.0,-1.,0.5]
     for ch in range(1,len(energy_range)):
+        xray_scale = max(xray_scale_list[ch-1],0.)
         param_init += [xray_scale]
-        param_bound_upper += [10.]
-        param_bound_lower += [0.0001]
+        param_bound_upper += [1000.]
+        param_bound_lower += [0.0]
     result = least_squares(residuals, x0=param_init, bounds=(param_bound_lower,param_bound_upper))  # x0 is the initial guess for A
     #result = least_squares(residuals, x0=param_init)  # x0 is the initial guess for A
 
-    sp_scale_norm = result.x[0]
-    sp_scale_index = result.x[1]
+    #sp_scale_norm = result.x[0]
+    #sp_scale_index = result.x[1]
+    #qpb_scale_norm = result.x[2]
+    sp_scale_norm = sp_scale_avg
+    sp_scale_index = 0.
+    qpb_scale_norm = 1.
 
 
-    return sp_scale_norm, sp_scale_index
+    return sp_scale_norm, sp_scale_index, qpb_scale_norm
     
 def make_timecut_mask(lightcurve_data,lightcurve_bkgd):
 
@@ -1086,7 +1099,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         qpb_detx_fov_template[ch].add(on_detx_fwc_fov[ch])
         qpb_image_fov_template[ch].add(on_image_fwc_fov[ch])
 
-    spf_scaling_norm, spf_scaling_index = fit_pattern(energy_range,on_pattern_sci_fov,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
+    spf_scaling_norm, spf_scaling_index, qpb_scaling_norm = fit_pattern(energy_range,on_pattern_sci_fov,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
+    print ('qpb_scaling_norm = %s'%(qpb_scaling_norm))
     print ('spf_scaling_norm = %s'%(spf_scaling_norm))
     print ('spf_scaling_index = %s'%(spf_scaling_index))
         
@@ -1102,11 +1116,15 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         sp_image_fov_template[ch].add(on_image_fwc_fov[ch],sp_pattern_norm/qpb_pattern_norm)
 
     for ch in range(1,len(energy_range)):
-        sp_pattern_fov_template[ch].scale(spf_scaling_norm*pow(energy_range[ch]/1000.,spf_scaling_index))
-        sp_spectrum_fov_template[ch].scale(spf_scaling_norm*pow(energy_range[ch]/1000.,spf_scaling_index))
+        qpb_pattern_fov_template[ch].scale(qpb_scaling_norm)
+        qpb_spectrum_fov_template[ch].scale(qpb_scaling_norm)
+        sp_pattern_fov_template[ch].scale(spf_scaling_norm*pow(energy_range[ch-1]/1000.,spf_scaling_index))
+        sp_spectrum_fov_template[ch].scale(spf_scaling_norm*pow(energy_range[ch-1]/1000.,spf_scaling_index))
     for ch in range(1,len(energy_range)):
-        sp_detx_fov_template[ch].scale(spf_scaling_norm*pow(energy_range[ch]/1000.,spf_scaling_index))
-        sp_image_fov_template[ch].scale(spf_scaling_norm*pow(energy_range[ch]/1000.,spf_scaling_index))
+        qpb_detx_fov_template[ch].scale(qpb_scaling_norm)
+        qpb_image_fov_template[ch].scale(qpb_scaling_norm)
+        sp_detx_fov_template[ch].scale(spf_scaling_norm*pow(energy_range[ch-1]/1000.,spf_scaling_index))
+        sp_image_fov_template[ch].scale(spf_scaling_norm*pow(energy_range[ch-1]/1000.,spf_scaling_index))
 
 
     on_spectrum_sci_fov_bkg_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
