@@ -20,6 +20,6 @@ mos2_fits=$(ls P*M2S002MIEVL*)
 echo "Copy files:"
 echo $mos1_fits
 echo $mos2_fits
-cp $mos1_fits mos1S001.fits
-cp $mos2_fits mos2S002.fits
+cp $mos1_fits mos1.fits
+cp $mos2_fits mos2.fits
 

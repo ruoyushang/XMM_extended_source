@@ -7,7 +7,7 @@
 #cd /Users/rshang/xmm_analysis/extragalactic/ID0827200401
 #cd /Users/rshang/xmm_analysis/extragalactic/ID0827200501
 #cd /Users/rshang/xmm_analysis/extragalactic/ID0827251001
-cd /Users/rshang/xmm_analysis/extragalactic/ID0827251101
+#cd /Users/rshang/xmm_analysis/extragalactic/ID0827251101
 #
 #cd /Users/rshang/xmm_analysis/MGRO_J1908_p06/ID0553640201
 #cd /Users/rshang/xmm_analysis/RX_J1241.5_p3250/ID0056020901
@@ -20,6 +20,8 @@ cd /Users/rshang/xmm_analysis/extragalactic/ID0827251101
 #cd /Users/rshang/xmm_analysis/Cas_A/ID0764640101
 #cd /Users/rshang/xmm_analysis/Cas_A/ID0782961401
 
+cd /Users/rshang/xmm_analysis/PSR_J1856_p0245/ID0302970201
+#cd /Users/rshang/xmm_analysis/PSR_J1856_p0245/ID0505920101
 
 
 cp /Users/rshang/xmm_analysis/analysis_code/*.sh .
@@ -38,7 +40,7 @@ cp /Users/rshang/xmm_analysis/analysis_code/*.py .
 
 sh run_filtering.sh
 sh run_regions.sh
-#sh run_response.sh
+sh run_response.sh
 
 
 
