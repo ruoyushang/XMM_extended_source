@@ -4,9 +4,9 @@ import math
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 #from mpl_toolkits.axes_grid1 import make_axes_locatable
-from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
+from astropy import wcs
 from astropy.utils.data import get_pkg_data_filename
 import astropy.units as u
 import astropy.utils as utils
@@ -30,23 +30,26 @@ on_obsID = sys.argv[2]
 
 diagnostic_plots = True
 #diagnostic_plots = False
-#fast_test = True
-fast_test = False
+fast_test = True
+#fast_test = False
 
 #detector = 'mos1'
 detector = 'mos2'
 
-on_filter = 'fov'
+on_filter = sys.argv[3]
+#on_filter = 'fov'
 #on_filter = 'reg1'
 #on_filter = 'reg2'
 #on_filter = 'reg3'
 #on_filter = 'reg4'
 
-#energy_array = [2000,4000,6000,8000,10000,12000]
-energy_array = [3000,5000,8000,12000]
-#energy_array = [3000,12000]
-#ana_ccd_bins = [1,2,3,4,5,6,7]
-ana_ccd_bins = [0]
+#energy_array = [2000,3000,5000,8000,12000]
+#energy_array = [3000,5000,8000,12000]
+energy_array = [2000,12000]
+ana_ccd_bins = [1,2,3,4,5,6,7]
+#ana_ccd_bins = [0]
+
+output_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
 
 source_radius = 1000
 ring_inner_radius = 1500
@@ -86,6 +89,21 @@ src_dety = 0
 if 'ID0400210101' in on_obsID:
     src_detx = 13000
     src_dety = 13000
+
+def SaveImage(image_input,filename):
+
+    new_image_data = image_input.zaxis
+
+    my_hdu = fits.PrimaryHDU(new_image_data)
+    my_hdul = fits.HDUList([my_hdu])
+    my_hdul.writeto('%s/%s.fits'%(output_dir,filename), overwrite=True)
+    
+def SaveSpectrum(spec_input,filename):
+
+    count = fits.Column(name='Count', array=spec_input.yaxis, format='K')
+    energy = fits.Column(name='Energy', array=spec_input.xaxis, format='K')
+    my_table = fits.BinTableHDU.from_columns([count,energy],name='SPECTRUM')
+    my_table.writeto('%s/%s.fits'%(output_dir,filename), overwrite=True)
 
 def get_conversion_mtx():
     radec_filename = '../%s/%s/analysis/pointing_coord.txt'%(on_sample,on_obsID)
@@ -332,7 +350,7 @@ class MyArray1D:
             else:
                 self.yaxis[idx_x] = -z_score
 
-def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',energy_range=[200,12000],ccd_id=0):
+def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',energy_range=[2000,12000],ccd_id=0):
 
     # how to read events:
     # https://docs.astropy.org/en/stable/generated/examples/io/fits-tables.html#accessing-data-stored-as-a-table-in-a-multi-extension-fits-mef-file
@@ -381,8 +399,8 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',e
         #evt_energy = 0.5*(energy_lo+energy_hi)*1000.
 
         evt_pi = events[evt]['PI']
-        if evt_pi<energy_range[0]: continue
-        if evt_pi>energy_range[len(energy_range)-1]: continue
+        #if evt_pi<energy_range[0]: continue
+        #if evt_pi>energy_range[len(energy_range)-1]: continue
 
         channel = 0
         for ch in range(1,len(energy_range)):
@@ -403,6 +421,7 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',e
         if evt_pi>=energy_range[len(energy_range)-1]: continue
 
         if evt_pattern>4:continue
+        #if evt_pattern==0:continue
 
         #if 'Al' in evt_filter:
         #    if evt_pi<1200: continue
@@ -587,37 +606,51 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
         sp_scale_avg += sp_scale_list[ch-1]
     sp_scale_avg = sp_scale_avg/float(len(energy_range)-1)
 
-    qpb_cnt_list = []
-    spf_cnt_list = []
-    xray_cnt_list = []
-    print ('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-    for ch in range(1,len(energy_range)):
-        data_cnt = data_pattern[ch].integral()
-        qpb_cnt = qpb_pattern[ch].integral()
-        spf_cnt = sp_scale_list[ch-1]*spf_pattern[ch].integral()
-        xray_cnt = xray_scale_list[ch-1]*xray_pattern[ch].integral()
-        model_cnt = qpb_cnt + spf_cnt + xray_cnt
-        qpb_cnt_list += [qpb_cnt]
-        spf_cnt_list += [spf_cnt]
-        xray_cnt_list += [xray_cnt]
-        print ('ch = %s'%(ch))
-        print ('data_cnt = %s'%(data_cnt))
-        print ('model_cnt = %s'%(model_cnt))
-        print ('xray_cnt = %s'%(xray_cnt))
-        print ('spf_cnt = %s'%(spf_cnt))
-        print ('qpb_cnt = %s'%(qpb_cnt))
+    #qpb_cnt_list = []
+    #spf_cnt_list = []
+    #xray_cnt_list = []
+    #print ('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+    #for ch in range(1,len(energy_range)):
+    #    data_cnt = data_pattern[ch].integral()
+    #    qpb_cnt = qpb_pattern[ch].integral()
+    #    spf_cnt = sp_scale_list[ch-1]*spf_pattern[ch].integral()
+    #    xray_cnt = xray_scale_list[ch-1]*xray_pattern[ch].integral()
+    #    model_cnt = qpb_cnt + spf_cnt + xray_cnt
+    #    qpb_cnt_list += [qpb_cnt]
+    #    spf_cnt_list += [spf_cnt]
+    #    xray_cnt_list += [xray_cnt]
+    #    print ('ch = %s'%(ch))
+    #    print ('data_cnt = %s'%(data_cnt))
+    #    print ('model_cnt = %s'%(model_cnt))
+    #    print ('xray_cnt = %s'%(xray_cnt))
+    #    print ('spf_cnt = %s'%(spf_cnt))
+    #    print ('qpb_cnt = %s'%(qpb_cnt))
 
-    return xray_cnt_list, spf_cnt_list, qpb_cnt_list
+    #return xray_cnt_list, spf_cnt_list, qpb_cnt_list
 
     # Define the function to minimize (residuals)
     def residuals(A):
         chi = 0.
         for ch in range(1,len(energy_range)):
-            for pattern in range(0,5):
+            data_cnt_sum = 0.
+            qpb_model_sum = 0.
+            spf_model_sum = 0.
+            xray_raw_sum = 0.
+            for pattern in range(1,5):
+                data_cnt = data_pattern[ch].yaxis[pattern]
+                data_cnt_sum += data_cnt
+                qpb_model = qpb_pattern[ch].yaxis[pattern]
+                qpb_model_sum += qpb_model
+                spf_model = A[ch-1]*spf_pattern[ch].yaxis[pattern]
+                spf_model_sum += spf_model
+                xray_raw = xray_pattern[ch].yaxis[pattern]
+                xray_raw_sum += xray_raw
+            xray_scale_sum = (data_cnt_sum-qpb_model_sum-spf_model_sum)/xray_raw_sum
+            for pattern in range(1,5):
                 data_cnt = data_pattern[ch].yaxis[pattern]
                 qpb_model = qpb_pattern[ch].yaxis[pattern]
                 spf_model = A[ch-1]*spf_pattern[ch].yaxis[pattern]
-                xray_model = A[len(energy_range)-1+ch-1]*xray_pattern[ch].yaxis[pattern]
+                xray_model = xray_scale_sum*xray_pattern[ch].yaxis[pattern]
                 data_error = pow(data_cnt,0.5)
                 if data_error==0: continue
                 chi += (data_cnt - xray_model - spf_model - qpb_model) / data_error
@@ -629,13 +662,14 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     param_bound_upper = []
     param_bound_lower = []
     for ch in range(1,len(energy_range)):
-        param_init += [sp_scale_list[ch-1]]
-        param_bound_upper += [10.]
-        param_bound_lower += [0.]
-    for ch in range(1,len(energy_range)):
-        param_init += [xray_scale_list[ch-1]]
-        param_bound_upper += [1e4]
-        param_bound_lower += [0.]
+        sp_scale = sp_scale_list[ch-1]
+        sp_scale_upper = 10.*sp_scale
+        sp_scale_lower = 0.1*sp_scale
+        if sp_scale_upper==0.:
+            sp_scale_upper = 1e-10
+        param_init += [sp_scale]
+        param_bound_upper += [sp_scale_upper]
+        param_bound_lower += [sp_scale_lower]
     result = least_squares(residuals, x0=param_init, bounds=(param_bound_lower,param_bound_upper))  # x0 is the initial guess for A
 
     #sp_scale_norm = sp_scale_avg
@@ -649,7 +683,20 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     print ('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
     for ch in range(1,len(energy_range)):
         sp_scale_norm = result.x[ch-1]
-        xray_scale_norm = result.x[len(energy_range)-1+ch-1]
+        data_cnt_sum = 0.
+        qpb_model_sum = 0.
+        spf_model_sum = 0.
+        xray_raw_sum = 0.
+        for pattern in range(1,5):
+            data_cnt = data_pattern[ch].yaxis[pattern]
+            data_cnt_sum += data_cnt
+            qpb_model = qpb_pattern[ch].yaxis[pattern]
+            qpb_model_sum += qpb_model
+            spf_model = sp_scale_norm*spf_pattern[ch].yaxis[pattern]
+            spf_model_sum += spf_model
+            xray_raw = xray_pattern[ch].yaxis[pattern]
+            xray_raw_sum += xray_raw
+        xray_scale_norm = (data_cnt_sum-qpb_model_sum-spf_model_sum)/xray_raw_sum
         data_cnt = data_pattern[ch].integral()
         qpb_cnt = qpb_scale_norm*qpb_pattern[ch].integral()
         spf_cnt = sp_scale_norm*spf_pattern[ch].integral()
@@ -711,8 +758,8 @@ xray_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(xray_sample,xra
 xray_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(xray_sample,xray_obsID,detector)
 xray_rmf_filename = '../%s/%s/analysis/%s-src-rmf.fits'%(xray_sample,xray_obsID,detector)
 
-off_sci_fov_evt_filename = '../%s/%s/analysis/%s-fov-evt.fits'%(off_sample,off_obsID,detector)
-off_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-fov-evt.fits'%(off_sample,off_obsID,detector)
+off_sci_fov_evt_filename = '../%s/%s/analysis/%s-%s-evt.fits'%(off_sample,off_obsID,detector,on_filter)
+off_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-%s-evt.fits'%(off_sample,off_obsID,detector,on_filter)
 off_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(off_sample,off_obsID,detector)
 off_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(off_sample,off_obsID,detector)
 off_rmf_filename = '../%s/%s/analysis/%s-src-rmf.fits'%(off_sample,off_obsID,detector)
@@ -728,10 +775,10 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('prepare xray sample time cuts')
     
-    output_all_fov = read_event_file(xray_sci_fov_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=0)
-    output_all_cor = read_event_file(xray_sci_cor_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=0)
-    output_fwc_fov = read_event_file(xray_fwc_fov_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=0)
-    output_fwc_cor = read_event_file(xray_fwc_cor_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=0)
+    output_all_fov = read_event_file(xray_sci_fov_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_all_cor = read_event_file(xray_sci_cor_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_fov = read_event_file(xray_fwc_fov_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_cor = read_event_file(xray_fwc_cor_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
 
     xray_duration_all_fov = output_all_fov[0]
     xray_evt_count_all_fov = output_all_fov[1]
@@ -819,10 +866,10 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('prepare off sample time cuts')
     
-    output_all_fov = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
-    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
-    output_all_cor = read_event_file(off_sci_cor_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
-    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_all_fov = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_all_cor = read_event_file(off_sci_cor_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
     
     off_duration_all_fov = output_all_fov[0]
     off_evt_count_all_fov = output_all_fov[1]
@@ -879,8 +926,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('apply off sample space and time masks')
     
-    output_sci_fov = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
-    output_sci_cor = read_event_file(off_sci_cor_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    output_sci_fov = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
+    output_sci_cor = read_event_file(off_sci_cor_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
     
     off_duration_sci_fov = output_sci_fov[0]
     off_evt_count_sci_fov = output_sci_fov[1]
@@ -898,8 +945,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     off_detx_sci_cor = output_sci_cor[5]
     off_image_sci_cor = output_sci_cor[6]
     
-    output_spf_fov = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range,ccd_id=ccd_id)
-    output_spf_cor = read_event_file(off_sci_cor_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range,ccd_id=ccd_id)
+    output_spf_fov = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
+    output_spf_cor = read_event_file(off_sci_cor_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
     
     off_duration_spf_fov = output_spf_fov[0]
     off_evt_count_spf_fov = output_spf_fov[1]
@@ -917,8 +964,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     off_detx_spf_cor = output_spf_cor[5]
     off_image_spf_cor = output_spf_cor[6]
     
-    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
-    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range)
+    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='',energy_range=energy_range)
     
     off_duration_fwc_fov = output_fwc_fov[0]
     off_evt_count_fwc_fov = output_fwc_fov[1]
@@ -987,7 +1034,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_yscale('log')
         axbig.set_xlabel('Time')
         axbig.legend(loc='best')
-        fig.savefig("../output_plots/lightcurve_off_timecut_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        fig.savefig("%s/lightcurve_off_timecut_ch%s_ccd%s_%s.png"%(output_dir,energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
 
         fig.clf()
@@ -998,7 +1045,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_xlabel('Energy [eV]')
         axbig.legend(loc='best')
         axbig.set_yscale('log')
-        fig.savefig("../output_plots/off_spectrum_fov_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        fig.savefig("%s/off_spectrum_fov_raw_ch%s_ccd%s_%s.png"%(output_dir,energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
 
         fig.clf()
@@ -1009,7 +1056,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_xlabel('Energy [eV]')
         axbig.legend(loc='best')
         axbig.set_yscale('log')
-        fig.savefig("../output_plots/off_spectrum_cor_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        fig.savefig("%s/off_spectrum_cor_raw_ch%s_ccd%s_%s.png"%(output_dir,energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
 
         fig.clf()
@@ -1020,7 +1067,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_xlabel('Pattern')
         axbig.legend(loc='best')
         axbig.set_yscale('log')
-        fig.savefig("../output_plots/off_pattern_fov_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        fig.savefig("%s/off_pattern_fov_raw_ch%s_ccd%s_%s.png"%(output_dir,energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
 
     sp_pattern_fov_template = []
@@ -1038,10 +1085,10 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('prepare on sample time cuts')
     
-    output_all_fov = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
-    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
-    output_all_cor = read_event_file(on_sci_cor_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
-    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_all_fov = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_all_cor = read_event_file(on_sci_cor_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
     
     on_duration_all_fov = output_all_fov[0]
     on_evt_count_all_fov = output_all_fov[1]
@@ -1183,7 +1230,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_yscale('log')
         axbig.set_xlabel('Time')
         axbig.legend(loc='best')
-        fig.savefig("../output_plots/lightcurve_on_timecut_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        fig.savefig("%s/lightcurve_on_timecut_ch%s_ccd%s_%s.png"%(output_dir,energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
 
         fig.clf()
@@ -1193,7 +1240,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_xlabel('Energy [eV]')
         axbig.legend(loc='best')
         axbig.set_yscale('log')
-        fig.savefig("../output_plots/on_spectrum_fov_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        fig.savefig("%s/on_spectrum_fov_raw_ch%s_ccd%s_%s.png"%(output_dir,energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
 
         fig.clf()
@@ -1203,7 +1250,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_xlabel('Energy [eV]')
         axbig.legend(loc='best')
         axbig.set_yscale('log')
-        fig.savefig("../output_plots/on_spectrum_cor_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        fig.savefig("%s/on_spectrum_cor_raw_ch%s_ccd%s_%s.png"%(output_dir,energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
 
         fig.clf()
@@ -1213,7 +1260,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_xlabel('Pattern')
         axbig.legend(loc='best')
         axbig.set_yscale('log')
-        fig.savefig("../output_plots/on_pattern_fov_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        fig.savefig("%s/on_pattern_fov_raw_ch%s_ccd%s_%s.png"%(output_dir,energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
 
         fig.clf()
@@ -1223,7 +1270,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         axbig.set_xlabel('Pattern')
         axbig.legend(loc='best')
         axbig.set_yscale('log')
-        fig.savefig("../output_plots/on_pattern_cor_raw_ch%s_ccd%s_%s.png"%(energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
+        fig.savefig("%s/on_pattern_cor_raw_ch%s_ccd%s_%s.png"%(output_dir,energy_range[0],ccd_id,plot_tag),bbox_inches='tight')
         axbig.remove()
 
     print ('predict SP background')
@@ -1244,11 +1291,11 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         ch_norm = on_spectrum_fwc_fov[ch].integral()/on_pattern_fwc_fov[0].integral()
         qpb_pattern_fov_template[ch].add(on_pattern_fwc_fov[0],factor=ch_norm)
 
-    #xray_pattern_fov_template = []
-    #for ch in range(0,len(energy_range)):
-    #    xray_pattern_fov_template += [MyArray1D(bin_start=pattern_low,bin_end=pattern_high,pixel_scale=pattern_scale)]
-    #for ch in range(0,len(energy_range)):
-    #    xray_pattern_fov_template[ch].add(qpb_pattern_fov_template[ch])
+    xray_pattern_fov_template = []
+    for ch in range(0,len(energy_range)):
+        xray_pattern_fov_template += [MyArray1D(bin_start=pattern_low,bin_end=pattern_high,pixel_scale=pattern_scale)]
+    for ch in range(0,len(energy_range)):
+        xray_pattern_fov_template[ch].add(qpb_pattern_fov_template[ch])
 
     xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
         
@@ -1323,21 +1370,27 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
             axbig.errorbar(qpb_pattern_fov_template[ch].xaxis,qpb_pattern_fov_template[ch].yaxis,yerr=qpb_pattern_fov_template[ch].yerr,color='b',label='QPB')
             axbig.bar(sp_pattern_fov_template[ch].xaxis,sp_pattern_fov_template[ch].yaxis,color='orange',label='SP Flare')
             axbig.set_yscale('log')
+            axbig.set_ylim(bottom=1)
             axbig.set_xlabel('PATTERN')
             axbig.legend(loc='best')
-            fig.savefig("../output_plots/pattern_on_fov_scaled_ch%s_ccd%s_%s.png"%(ch,ccd_id,plot_tag),bbox_inches='tight')
+            fig.savefig("%s/pattern_on_fov_scaled_ch%s_ccd%s_%s.png"%(output_dir,ch,ccd_id,plot_tag),bbox_inches='tight')
             axbig.remove()
 
         for ch in range(1,len(energy_range)):
+            bkg_spectrum_fov = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+            bkg_spectrum_fov.add(qpb_spectrum_fov_template[ch])
+            bkg_spectrum_fov.add(sp_spectrum_fov_template[ch])
             fig.clf()
             axbig = fig.add_subplot()
             axbig.errorbar(on_spectrum_sci_fov[ch].xaxis,on_spectrum_sci_fov[ch].yaxis,yerr=on_spectrum_sci_fov[ch].yerr,color='k',label='Data')
             axbig.errorbar(qpb_spectrum_fov_template[ch].xaxis,qpb_spectrum_fov_template[ch].yaxis,yerr=qpb_spectrum_fov_template[ch].yerr,color='b',label='QPB')
             axbig.errorbar(sp_spectrum_fov_template[ch].xaxis,sp_spectrum_fov_template[ch].yaxis,yerr=sp_spectrum_fov_template[ch].yerr,color='orange',label='SP Flare')
+            axbig.errorbar(bkg_spectrum_fov.xaxis,bkg_spectrum_fov.yaxis,yerr=bkg_spectrum_fov.yerr,color='red',label='BKG')
             axbig.set_yscale('log')
+            axbig.set_ylim(bottom=1)
             axbig.set_xlabel('Energy [eV]')
             axbig.legend(loc='best')
-            fig.savefig("../output_plots/spectrum_on_fov_scaled_ch%s_ccd%s_%s.png"%(ch,ccd_id,plot_tag),bbox_inches='tight')
+            fig.savefig("%s/spectrum_on_fov_scaled_ch%s_ccd%s_%s.png"%(output_dir,ch,ccd_id,plot_tag),bbox_inches='tight')
             axbig.remove()
 
         for ch in range(1,len(energy_range)):
@@ -1353,7 +1406,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
             axbig.set_yscale('log')
             axbig.set_xlabel('Pattern')
             axbig.legend(loc='best')
-            fig.savefig("../output_plots/pattern_fov_template_ch%s_ccd%s_%s.png"%(ch,ccd_id,plot_tag),bbox_inches='tight')
+            fig.savefig("%s/pattern_fov_template_ch%s_ccd%s_%s.png"%(output_dir,ch,ccd_id,plot_tag),bbox_inches='tight')
             axbig.remove()
 
 
@@ -1364,10 +1417,10 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     return output_spectrum, output_detx, output_image
 
 
-on_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+sci_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 bkg_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 qpb_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-sp_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+spf_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 
 on_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
 bkg_detx_sum = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
@@ -1388,9 +1441,9 @@ sp_image_sum = MyArray2D()
 
 for ccd in range(0,len(ana_ccd_bins)):
     ana_output_spectrum, ana_output_detx, ana_output_image = analyze_a_ccd_chip(energy_range=energy_array,ccd_id=ana_ccd_bins[ccd])
-    on_spectrum_sum.add(ana_output_spectrum[0])
+    sci_spectrum_sum.add(ana_output_spectrum[0])
     bkg_spectrum_sum.add(ana_output_spectrum[1])
-    sp_spectrum_sum.add(ana_output_spectrum[2])
+    spf_spectrum_sum.add(ana_output_spectrum[2])
     qpb_spectrum_sum.add(ana_output_spectrum[3])
     on_detx_sum.add(ana_output_detx[0])
     bkg_detx_sum.add(ana_output_detx[1])
@@ -1412,16 +1465,21 @@ excess_image_sum.add(bkg_image_sum,-1.)
 
 fig.clf()
 axbig = fig.add_subplot()
-axbig.errorbar(on_spectrum_sum.xaxis,on_spectrum_sum.yaxis,yerr=on_spectrum_sum.yerr,color='k',label='Data')
+axbig.errorbar(sci_spectrum_sum.xaxis,sci_spectrum_sum.yaxis,yerr=sci_spectrum_sum.yerr,color='k',label='Data')
 axbig.plot(bkg_spectrum_sum.xaxis,bkg_spectrum_sum.yaxis,color='red',label='Bkg')
-axbig.plot(sp_spectrum_sum.xaxis,sp_spectrum_sum.yaxis,label='SP')
+axbig.plot(spf_spectrum_sum.xaxis,spf_spectrum_sum.yaxis,label='SP')
 axbig.plot(qpb_spectrum_sum.xaxis,qpb_spectrum_sum.yaxis,label='QPB')
 axbig.set_yscale('log')
 axbig.set_ylim(bottom=1)
 axbig.set_xlabel('Energy [eV]')
 axbig.legend(loc='best')
-fig.savefig("../output_plots/spectrum_on_fit_sum_%s.png"%(plot_tag),bbox_inches='tight')
+fig.savefig("%s/spectrum_on_fit_sum_%s.png"%(output_dir,plot_tag),bbox_inches='tight')
 axbig.remove()
+
+SaveSpectrum(sci_spectrum_sum,'sci_spectrum_sum')
+SaveSpectrum(bkg_spectrum_sum,'bkg_spectrum_sum')
+SaveSpectrum(qpb_spectrum_sum,'qpb_spectrum_sum')
+SaveSpectrum(spf_spectrum_sum,'spf_spectrum_sum')
 
 fig.clf()
 axbig = fig.add_subplot()
@@ -1433,7 +1491,7 @@ axbig.set_yscale('log')
 axbig.set_ylim(bottom=1)
 axbig.set_xlabel('DETX')
 axbig.legend(loc='best')
-fig.savefig("../output_plots/detx_on_fit_sum_%s.png"%(plot_tag),bbox_inches='tight')
+fig.savefig("%s/detx_on_fit_sum_%s.png"%(output_dir,plot_tag),bbox_inches='tight')
 axbig.remove()
 
 fig.clf()
@@ -1447,22 +1505,11 @@ xmax = on_image_sum.xaxis.max()
 ymin = on_image_sum.yaxis.min()
 ymax = on_image_sum.yaxis.max()
 axbig.imshow(excess_image_sum.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("../output_plots/image_det_sum_%s.png"%(plot_tag),bbox_inches='tight')
+fig.savefig("%s/image_det_sum_%s.png"%(output_dir,plot_tag),bbox_inches='tight')
 axbig.remove()
 
-#fig.clf()
-#axbig = fig.add_subplot()
-#label_x = 'RA'
-#label_y = 'Dec'
-#axbig.set_xlabel(label_x)
-#axbig.set_ylabel(label_y)
-#xmin = on_image_sky_sum.xaxis.min()
-#xmax = on_image_sky_sum.xaxis.max()
-#ymin = on_image_sky_sum.yaxis.min()
-#ymax = on_image_sky_sum.yaxis.max()
-#axbig.imshow(excess_image_sky_sum.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-#fig.savefig("../output_plots/image_sky_sum_%s.png"%(plot_tag),bbox_inches='tight')
-#axbig.remove()
+SaveImage(excess_image_sum,'image_det_sum')
+
 
 
 
