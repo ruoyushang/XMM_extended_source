@@ -30,8 +30,8 @@ on_obsID = sys.argv[2]
 
 diagnostic_plots = True
 #diagnostic_plots = False
-fast_test = True
-#fast_test = False
+#fast_test = True
+fast_test = False
 
 #detector = 'mos1'
 detector = 'mos2'
@@ -44,10 +44,10 @@ on_filter = sys.argv[3]
 #on_filter = 'reg4'
 
 #energy_array = [2000,3000,5000,8000,12000]
-#energy_array = [3000,5000,8000,12000]
-energy_array = [2000,12000]
-ana_ccd_bins = [1,2,3,4,5,6,7]
-#ana_ccd_bins = [0]
+energy_array = [2000,3000,5000,8000,12000]
+#energy_array = [2000,12000]
+#ana_ccd_bins = [1,2,3,4,5,6,7]
+ana_ccd_bins = [0]
 
 output_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
 
@@ -100,8 +100,8 @@ def SaveImage(image_input,filename):
     
 def SaveSpectrum(spec_input,filename):
 
-    count = fits.Column(name='Count', array=spec_input.yaxis, format='K')
-    energy = fits.Column(name='Energy', array=spec_input.xaxis, format='K')
+    count = fits.Column(name='Count', array=spec_input.yaxis, format='D')
+    energy = fits.Column(name='Energy', array=spec_input.xaxis, format='D')
     my_table = fits.BinTableHDU.from_columns([count,energy],name='SPECTRUM')
     my_table.writeto('%s/%s.fits'%(output_dir,filename), overwrite=True)
 
@@ -337,6 +337,11 @@ class MyArray1D:
         for entry in range(0,len(self.yaxis)):
             self.yaxis[entry] = self.yaxis[entry]/reference
             self.yerr[entry] = self.yerr[entry]/reference
+    def normalize2(self):
+        reference = self.integral()
+        for entry in range(0,len(self.yaxis)):
+            self.yaxis[entry] = self.yaxis[entry]/reference
+            self.yerr[entry] = self.yerr[entry]/reference
     def calc_significance(self, src_array, bkg_array):
         for idx_x in range(0,len(self.xaxis)):
             src = src_array.yaxis[idx_x]
@@ -350,7 +355,7 @@ class MyArray1D:
             else:
                 self.yaxis[idx_x] = -z_score
 
-def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',energy_range=[2000,12000],ccd_id=0):
+def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=False,evt_filter='',energy_range=[2000,12000],ccd_id=0):
 
     # how to read events:
     # https://docs.astropy.org/en/stable/generated/examples/io/fits-tables.html#accessing-data-stored-as-a-table-in-a-multi-extension-fits-mef-file
@@ -383,6 +388,10 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',e
     time_start = events[0]['TIME']
     time_end = events[len(events)-1]['TIME']
     obs_duration = time_end-time_start
+
+    evt_detx_list = []
+    evt_dety_list = []
+    evt_pi_list = []
 
     for evt in range(0,len(events)):
 
@@ -422,12 +431,6 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',e
 
         if evt_pattern>4:continue
         #if evt_pattern==0:continue
-
-        #if 'Al' in evt_filter:
-        #    if evt_pi<1200: continue
-        #    if evt_pi>1900: continue
-        #if evt_pi>1200 and evt_pi<1900: continue
-        #if evt_pi<1900: continue
 
         if 'source' in evt_filter:
             if abs(evt_detx)>source_radius: continue
@@ -478,6 +481,10 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',e
         if not 'cor-evt' in filename and not ccd_id==0:
             if evt_ccd_id!=ccd_id: continue
 
+        evt_detx_list += [evt_detx]
+        evt_dety_list += [evt_dety]
+        evt_pi_list += [evt_pi]
+
         evt_count += 1.
         lightcurve_array.fill((evt_time-time_start)/(time_end-time_start))
         pattern_array[0].fill(evt_pattern)
@@ -488,6 +495,13 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,evt_filter='',e
         spectrum_array[channel].fill(evt_pi)
         detx_array[channel].fill(evt_detx)
         image_array[channel].fill(evt_detx,evt_dety)
+
+    if write_events:
+        col_detx = fits.Column(name='DETX', array=evt_detx_list, format='D')
+        col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
+        col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
+        my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
+        my_table.writeto('%s/sci_events_ccd%s.fits'%(output_dir,ccd_id), overwrite=True)
 
     return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array]
 
@@ -636,45 +650,33 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
             qpb_model_sum = 0.
             spf_model_sum = 0.
             xray_raw_sum = 0.
-            for pattern in range(1,5):
+            for pattern in range(0,5):
                 data_cnt = data_pattern[ch].yaxis[pattern]
                 data_cnt_sum += data_cnt
                 qpb_model = qpb_pattern[ch].yaxis[pattern]
                 qpb_model_sum += qpb_model
-                spf_model = A[ch-1]*spf_pattern[ch].yaxis[pattern]
+                spf_model = A[0]*spf_pattern[ch].yaxis[pattern]
                 spf_model_sum += spf_model
                 xray_raw = xray_pattern[ch].yaxis[pattern]
                 xray_raw_sum += xray_raw
             xray_scale_sum = (data_cnt_sum-qpb_model_sum-spf_model_sum)/xray_raw_sum
-            for pattern in range(1,5):
+            for pattern in range(0,5):
                 data_cnt = data_pattern[ch].yaxis[pattern]
                 qpb_model = qpb_pattern[ch].yaxis[pattern]
-                spf_model = A[ch-1]*spf_pattern[ch].yaxis[pattern]
+                spf_model = A[0]*spf_pattern[ch].yaxis[pattern]
                 xray_model = xray_scale_sum*xray_pattern[ch].yaxis[pattern]
                 data_error = pow(data_cnt,0.5)
                 if data_error==0: continue
-                chi += (data_cnt - xray_model - spf_model - qpb_model) / data_error
-                #chi += (data_cnt - xray_model - spf_model - qpb_model)
+                #chi += (data_cnt - abs(xray_model) - spf_model - qpb_model) / data_error
+                chi += (data_cnt - abs(xray_model) - spf_model - qpb_model)
         return chi
 
     qpb_scale = 1.
-    param_init = []
-    param_bound_upper = []
-    param_bound_lower = []
-    for ch in range(1,len(energy_range)):
-        sp_scale = sp_scale_list[ch-1]
-        sp_scale_upper = 10.*sp_scale
-        sp_scale_lower = 0.1*sp_scale
-        if sp_scale_upper==0.:
-            sp_scale_upper = 1e-10
-        param_init += [sp_scale]
-        param_bound_upper += [sp_scale_upper]
-        param_bound_lower += [sp_scale_lower]
+    param_init = [sp_scale_avg]
+    param_bound_upper = [max(10.*sp_scale_avg,1e-3)]
+    param_bound_lower = [0.]
     result = least_squares(residuals, x0=param_init, bounds=(param_bound_lower,param_bound_upper))  # x0 is the initial guess for A
 
-    #sp_scale_norm = sp_scale_avg
-    #sp_scale_index = 0.
-    #qpb_scale_norm = result.x[0]
     qpb_scale_norm = 1.
 
     qpb_cnt_list = []
@@ -682,12 +684,12 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     xray_cnt_list = []
     print ('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
     for ch in range(1,len(energy_range)):
-        sp_scale_norm = result.x[ch-1]
+        sp_scale_norm = result.x[0]
         data_cnt_sum = 0.
         qpb_model_sum = 0.
         spf_model_sum = 0.
         xray_raw_sum = 0.
-        for pattern in range(1,5):
+        for pattern in range(0,5):
             data_cnt = data_pattern[ch].yaxis[pattern]
             data_cnt_sum += data_cnt
             qpb_model = qpb_pattern[ch].yaxis[pattern]
@@ -1151,7 +1153,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('apply space and time masks')
     
-    output_sci_fov = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    output_sci_fov = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=mask_lc,mask_map=None,write_events=True,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
     output_sci_cor = read_event_file(on_sci_cor_evt_filename,on_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
     
     on_duration_sci_fov = output_sci_fov[0]
@@ -1441,6 +1443,34 @@ sp_image_sum = MyArray2D()
 
 for ccd in range(0,len(ana_ccd_bins)):
     ana_output_spectrum, ana_output_detx, ana_output_image = analyze_a_ccd_chip(energy_range=energy_array,ccd_id=ana_ccd_bins[ccd])
+
+    prob_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+    prob_spectrum.add(ana_output_spectrum[1])
+    prob_spectrum.normalize2()
+    #for binx in range(0,len(prob_spectrum.xaxis)):
+    #    print ('ana_output_spectrum[0].yaxis[binx] = %s'%(ana_output_spectrum[0].yaxis[binx]))
+    #    print ('ana_output_spectrum[1].yaxis[binx] = %s'%(ana_output_spectrum[1].yaxis[binx]))
+    #    print ('prob_spectrum.yaxis[binx] = %s'%(prob_spectrum.yaxis[binx]))
+
+    evt_detx_list = []
+    evt_dety_list = []
+    evt_pi_list = []
+    for idx_x in range(0,len(ana_output_image[1].xaxis)):
+        for idx_y in range(0,len(ana_output_image[1].yaxis)):
+            evt_detx = ana_output_image[1].xaxis[idx_x]
+            evt_dety = ana_output_image[1].yaxis[idx_y]
+            sum_bkg = ana_output_image[1].zaxis[idx_x,idx_y]
+            evt_pi = np.random.choice(a=prob_spectrum.xaxis, size=int(sum_bkg*10), p=prob_spectrum.yaxis)
+            for evt in range(0,len(evt_pi)):
+                evt_detx_list += [evt_detx]
+                evt_dety_list += [evt_dety]
+                evt_pi_list += [evt_pi[evt]]
+    col_detx = fits.Column(name='DETX', array=evt_detx_list, format='D')
+    col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
+    col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
+    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
+    my_table.writeto('%s/bkg_events_ccd%s.fits'%(output_dir,ana_ccd_bins[ccd]), overwrite=True)
+
     sci_spectrum_sum.add(ana_output_spectrum[0])
     bkg_spectrum_sum.add(ana_output_spectrum[1])
     spf_spectrum_sum.add(ana_output_spectrum[2])
