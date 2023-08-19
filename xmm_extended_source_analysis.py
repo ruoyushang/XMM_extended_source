@@ -71,7 +71,7 @@ on_filter = sys.argv[3]
 #on_filter = 'reg4'
 
 #energy_array = [200,1000,2000,3000,5000,8000,12000]
-energy_array = [200,2000,4000,6000,8000,10000,12000]
+energy_array = [1000,2000,4000,6000,8000,10000,12000]
 #energy_array = [2000,12000]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 ana_ccd_bins = [0]
@@ -402,11 +402,14 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     def residuals(A):
         chi2 = 0.
         for ch in range(1,len(energy_range)):
+            #channel_weight = 1./pow(pow(data_pattern[ch].yaxis[2]-qpb_pattern[ch].yaxis[2],2),0.5)
+            channel_weight = 1./abs(spfree_data_qpb_ratio[ch-1]-1.)
             data_cnt_sum = 0.
             qpb_model_sum = 0.
             spf_model_sum = 0.
             xray_raw_sum = 0.
             spf_scale = A[0]
+            penalty = (A[0]-sp_scale_list[ch-1])*spf_pattern[ch].integral()*channel_weight
             for pattern in range(0,5):
                 data_cnt = data_pattern[ch].yaxis[pattern]
                 qpb_model = qpb_pattern[ch].yaxis[pattern]
@@ -431,9 +434,11 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
                 spf_model_sum += spf_model
                 xray_model_sum += xray_model
                 if data_cnt==0: continue
-                square_error = pow(data_pattern[ch].yaxis[2]-qpb_pattern[ch].yaxis[2],2)
-                weight = 1./pow(square_error,0.5)
-                chi2 += (data_cnt - xray_model - spf_model - qpb_model)*weight
+                pattern_weight = data_pattern[ch].integral()/data_cnt
+                weight = pattern_weight*channel_weight
+                chi = (data_cnt - xray_model - spf_model - qpb_model)*weight
+                chi2 += chi*chi
+            chi2 += penalty*penalty
         return chi2
 
     print ('min_data_qpb_diff_ch = %s'%(min_data_qpb_diff_ch))
@@ -445,8 +450,8 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     param_init = np.array(param_init)
     param_bound_upper = np.array(param_bound_upper)
     param_bound_lower = np.array(param_bound_lower)
-    result = least_squares(residuals, x0=param_init, bounds=(param_bound_lower,param_bound_upper))  # x0 is the initial guess for A
-    #result = minimize(residuals, x0=param_init, method='Nelder-Mead')  # x0 is the initial guess for A
+    #result = least_squares(residuals, x0=param_init, bounds=(param_bound_lower,param_bound_upper))  # x0 is the initial guess for A
+    result = minimize(residuals, x0=param_init, method='Nelder-Mead')  # x0 is the initial guess for A
 
     qpb_scale_norm = 1.
 
@@ -458,8 +463,12 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     print ('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
     for ch in range(1,len(energy_range)):
         sp_scale_norm = result.x[0]
-        data_qpb_diff = abs(spfree_data_qpb_ratio[ch-1]-1.)
-        if data_qpb_diff<0.2:
+        spfree_data_qpb_diff = abs(spfree_data_qpb_ratio[ch-1]-1.)
+        data_qpb_diff = abs(data_qpb_ratio[ch-1]-1.)
+        print ('spfree_data_qpb_diff = %s'%(spfree_data_qpb_diff))
+        print ('data_qpb_diff = %s'%(data_qpb_diff))
+        if spfree_data_qpb_diff<0.5 and data_qpb_diff>0.5:
+            print ('use initial estimate')
             sp_scale_norm = sp_scale_list[ch-1] 
         data_cnt_sum = 0.
         qpb_model_sum = 0.

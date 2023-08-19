@@ -1,5 +1,6 @@
 
 import numpy as np
+import math
 
 pattern_low = 0
 pattern_high = 6
@@ -25,10 +26,9 @@ sky_scale = 0.001
 
 class MyArray2D:
 
-    def __init__(self,coord='det'):
+    def __init__(self,coord='det',pixel_scale=200):
         start_x = -19474.5
         start_y = -19474.5
-        pixel_scale = 200
         image_size = 39000
         if coord=='radec':
             start_x = sky_ra_low
@@ -116,6 +116,26 @@ class MyArray2D:
                     self.zaxis[idx_x,idx_y] = z_score
                 else:
                     self.zaxis[idx_x,idx_y] = -z_score
+    def calc_ratio(self, src_array, bkg_array):
+        for idx_x in range(0,len(self.xaxis)):
+            for idx_y in range(0,len(self.yaxis)):
+                src = src_array.zaxis[idx_x,idx_y]
+                bkg = bkg_array.zaxis[idx_x,idx_y]
+                if not src>0.: continue
+                if not bkg>0.: continue
+                ratio = (src-bkg)/bkg
+                self.zaxis[idx_x,idx_y] = ratio
+    def flattening(self):
+        pix_on_cnt = 0
+        for idx_x in range(0,len(self.xaxis)):
+            for idx_y in range(0,len(self.yaxis)):
+                if self.zaxis[idx_x,idx_y]!=0:
+                    pix_on_cnt += 1
+        avg_cnt = self.integral()/float(pix_on_cnt)
+        for idx_x in range(0,len(self.xaxis)):
+            for idx_y in range(0,len(self.yaxis)):
+                if self.zaxis[idx_x,idx_y]!=0:
+                    self.zaxis[idx_x,idx_y] = avg_cnt
 
 class MyArray1D:
 
