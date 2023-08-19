@@ -389,7 +389,9 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
         qpb_cnt_list += [qpb_cnt]
         spf_cnt_list += [spf_cnt]
         xray_cnt_list += [xray_cnt]
+        print ('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
         print ('ch = %s'%(ch))
+        print ('sp_scale_list[ch-1] = %s'%(sp_scale_list[ch-1]))
         print ('data_cnt = %s'%(data_cnt))
         print ('model_cnt = %s'%(model_cnt))
         print ('xray_cnt = %s'%(xray_cnt))
@@ -402,14 +404,13 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     def residuals(A):
         chi2 = 0.
         for ch in range(1,len(energy_range)):
-            #channel_weight = 1./pow(pow(data_pattern[ch].yaxis[2]-qpb_pattern[ch].yaxis[2],2),0.5)
             channel_weight = 1./abs(spfree_data_qpb_ratio[ch-1]-1.)
             data_cnt_sum = 0.
             qpb_model_sum = 0.
             spf_model_sum = 0.
             xray_raw_sum = 0.
             spf_scale = A[0]
-            penalty = (A[0]-sp_scale_list[ch-1])*spf_pattern[ch].integral()*channel_weight
+            penalty_spf = (A[0]-sp_scale_list[ch-1])*spf_pattern[ch].integral()*channel_weight
             for pattern in range(0,5):
                 data_cnt = data_pattern[ch].yaxis[pattern]
                 qpb_model = qpb_pattern[ch].yaxis[pattern]
@@ -435,10 +436,16 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
                 xray_model_sum += xray_model
                 if data_cnt==0: continue
                 pattern_weight = data_pattern[ch].integral()/data_cnt
-                weight = pattern_weight*channel_weight
+                weight = pattern_weight
                 chi = (data_cnt - xray_model - spf_model - qpb_model)*weight
                 chi2 += chi*chi
-            chi2 += penalty*penalty
+            penalty_xray = 0.
+            if xray_model_sum<0.:
+                penalty_xray = abs(xray_model_sum)
+            penalty_spf_neg = 0.
+            if spf_model_sum<0.:
+                penalty_spf_neg = abs(spf_model_sum)
+            chi2 += penalty_spf*penalty_spf + penalty_xray*penalty_xray + penalty_spf_neg*penalty_spf_neg
         return chi2
 
     print ('min_data_qpb_diff_ch = %s'%(min_data_qpb_diff_ch))
@@ -462,12 +469,16 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     print ('Optimized estimate')
     print ('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
     for ch in range(1,len(energy_range)):
+        print ('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
         sp_scale_norm = result.x[0]
+        print ('ch = %s'%(ch))
+        print ('sp_scale_list[ch-1] = %s'%(sp_scale_list[ch-1]))
+        print ('sp_scale_fit = %s'%(sp_scale_norm))
         spfree_data_qpb_diff = abs(spfree_data_qpb_ratio[ch-1]-1.)
         data_qpb_diff = abs(data_qpb_ratio[ch-1]-1.)
         print ('spfree_data_qpb_diff = %s'%(spfree_data_qpb_diff))
         print ('data_qpb_diff = %s'%(data_qpb_diff))
-        if spfree_data_qpb_diff<0.5 and data_qpb_diff>0.5:
+        if spfree_data_qpb_diff<1.0 and data_qpb_diff>1.0:
             print ('use initial estimate')
             sp_scale_norm = sp_scale_list[ch-1] 
         data_cnt_sum = 0.
@@ -492,7 +503,6 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
         qpb_cnt_list += [qpb_cnt]
         spf_cnt_list += [spf_cnt]
         xray_cnt_list += [xray_cnt]
-        print ('ch = %s'%(ch))
         print ('data_cnt = %s'%(data_cnt))
         print ('model_cnt = %s'%(model_cnt))
         print ('xray_cnt = %s'%(xray_cnt))
