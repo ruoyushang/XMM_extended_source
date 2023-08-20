@@ -61,9 +61,10 @@ fast_test = True
 #fast_test = False
 
 #detector = 'mos1'
-detector = 'mos2'
+#detector = 'mos2'
+detector = sys.argv[3]
 
-on_filter = sys.argv[3]
+on_filter = sys.argv[4]
 #on_filter = 'fov'
 #on_filter = 'reg1'
 #on_filter = 'reg2'
@@ -322,7 +323,7 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=Fa
         col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
         col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
         my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
-        my_table.writeto('%s/sci_events_ccd%s.fits'%(output_dir,ccd_id), overwrite=True)
+        my_table.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
 
     return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array]
 
@@ -441,10 +442,10 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
                 chi2 += chi*chi
             penalty_xray = 0.
             if xray_model_sum<0.:
-                penalty_xray = abs(xray_model_sum)
+                penalty_xray = 100.*abs(xray_model_sum)
             penalty_spf_neg = 0.
             if spf_model_sum<0.:
-                penalty_spf_neg = abs(spf_model_sum)
+                penalty_spf_neg = 100.*abs(spf_model_sum)
             chi2 += penalty_spf*penalty_spf + penalty_xray*penalty_xray + penalty_spf_neg*penalty_spf_neg
         return chi2
 
@@ -1544,7 +1545,7 @@ for ccd in range(0,len(ana_ccd_bins)):
     col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
     col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
     my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
-    my_table.writeto('%s/bkg_events_ccd%s.fits'%(output_dir,ana_ccd_bins[ccd]), overwrite=True)
+    my_table.writeto('%s/bkg_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     prob_spf_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     prob_spf_spectrum.add(ana_output_spectrum[2])
@@ -1567,7 +1568,7 @@ for ccd in range(0,len(ana_ccd_bins)):
     col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
     col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
     my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
-    my_table.writeto('%s/spf_events_ccd%s.fits'%(output_dir,ana_ccd_bins[ccd]), overwrite=True)
+    my_table.writeto('%s/spf_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     prob_qpb_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     prob_qpb_spectrum.add(ana_output_spectrum[3])
@@ -1590,7 +1591,7 @@ for ccd in range(0,len(ana_ccd_bins)):
     col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
     col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
     my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
-    my_table.writeto('%s/qpb_events_ccd%s.fits'%(output_dir,ana_ccd_bins[ccd]), overwrite=True)
+    my_table.writeto('%s/qpb_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     sci_spectrum_sum.add(ana_output_spectrum[0])
     bkg_spectrum_sum.add(ana_output_spectrum[1])
@@ -1627,10 +1628,10 @@ axbig.legend(loc='best')
 fig.savefig("%s/spectrum_on_fit_sum_%s.png"%(output_dir,plot_tag),bbox_inches='tight')
 axbig.remove()
 
-SaveSpectrum(sci_spectrum_sum,'sci_spectrum_sum')
-SaveSpectrum(bkg_spectrum_sum,'bkg_spectrum_sum')
-SaveSpectrum(qpb_spectrum_sum,'qpb_spectrum_sum')
-SaveSpectrum(spf_spectrum_sum,'spf_spectrum_sum')
+#SaveSpectrum(sci_spectrum_sum,'sci_spectrum_sum')
+#SaveSpectrum(bkg_spectrum_sum,'bkg_spectrum_sum')
+#SaveSpectrum(qpb_spectrum_sum,'qpb_spectrum_sum')
+#SaveSpectrum(spf_spectrum_sum,'spf_spectrum_sum')
 
 fig.clf()
 axbig = fig.add_subplot()
