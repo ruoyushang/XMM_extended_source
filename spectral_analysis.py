@@ -8,9 +8,9 @@ import matplotlib.pyplot as plt
 
 import common_functions
 
-on_sample = 'extragalactic'
+#on_sample = 'extragalactic'
 #on_obsID = 'ID0505460501'
-on_obsID = 'ID0690900101'
+#on_obsID = 'ID0690900101'
 #on_obsID = 'ID0803160301'
 #on_obsID = 'ID0820560101'
 #on_obsID = 'ID0827200401'
@@ -24,6 +24,11 @@ on_obsID = 'ID0690900101'
 #on_obsID = 'ID0400210101' # Cas A Northern lobe
 #on_obsID = 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
 
+on_sample = '3HWC_J1928_p178'
+on_obsID = 'ID0902120101'
+
+#detector = 'mos1'
+detector = 'mos2'
 
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
@@ -64,7 +69,7 @@ image_sci = MyArray2D(pixel_scale=1000)
 image_bkg = MyArray2D(pixel_scale=1000)
 for ccd in range(0,len(ana_ccd_bins)):
 
-    sci_filename = '%s/sci_events_ccd%s.fits'%(input_dir,ana_ccd_bins[ccd])
+    sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     sci_hdu_list = fits.open(sci_filename)
     sci_table = Table.read(sci_filename, hdu=1)
     for entry in range(0,len(sci_table)):
@@ -75,7 +80,7 @@ for ccd in range(0,len(ana_ccd_bins)):
         if evt_pi<energy_cut: continue
         image_sci.fill(evt_detx,evt_dety)
 
-    bkg_filename = '%s/bkg_events_ccd%s.fits'%(input_dir,ana_ccd_bins[ccd])
+    bkg_filename = '%s/bkg_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     bkg_hdu_list = fits.open(bkg_filename)
     bkg_table = Table.read(bkg_filename, hdu=1)
     for entry in range(0,len(bkg_table)):
@@ -101,9 +106,13 @@ spectrum_sci = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 spectrum_bkg = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 spectrum_qpb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 spectrum_spf = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+detx_sci = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=2.*detx_scale)
+detx_bkg = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=2.*detx_scale)
+detx_qpb = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=2.*detx_scale)
+detx_spf = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=2.*detx_scale)
 for ccd in range(0,len(ana_ccd_bins)):
 
-    sci_filename = '%s/sci_events_ccd%s.fits'%(input_dir,ana_ccd_bins[ccd])
+    sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     sci_hdu_list = fits.open(sci_filename)
     sci_table = Table.read(sci_filename, hdu=1)
     for entry in range(0,len(sci_table)):
@@ -116,8 +125,9 @@ for ccd in range(0,len(ana_ccd_bins)):
         if zscore>ratio_cut: continue
         image_sci.fill(evt_detx,evt_dety)
         spectrum_sci.fill(evt_pi)
+        detx_sci.fill(evt_detx)
 
-    bkg_filename = '%s/bkg_events_ccd%s.fits'%(input_dir,ana_ccd_bins[ccd])
+    bkg_filename = '%s/bkg_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     bkg_hdu_list = fits.open(bkg_filename)
     bkg_table = Table.read(bkg_filename, hdu=1)
     for entry in range(0,len(bkg_table)):
@@ -130,8 +140,9 @@ for ccd in range(0,len(ana_ccd_bins)):
         if zscore>ratio_cut: continue
         image_bkg.fill(evt_detx,evt_dety,weight=0.1)
         spectrum_bkg.fill(evt_pi,weight=0.1)
+        detx_bkg.fill(evt_detx,weight=0.1)
 
-    qpb_filename = '%s/qpb_events_ccd%s.fits'%(input_dir,ana_ccd_bins[ccd])
+    qpb_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     qpb_hdu_list = fits.open(qpb_filename)
     qpb_table = Table.read(qpb_filename, hdu=1)
     for entry in range(0,len(qpb_table)):
@@ -143,8 +154,9 @@ for ccd in range(0,len(ana_ccd_bins)):
         zscore = image_mask.get_bin_content(evt_detx,evt_dety)
         if zscore>ratio_cut: continue
         spectrum_qpb.fill(evt_pi,weight=0.1)
+        detx_qpb.fill(evt_detx,weight=0.1)
 
-    spf_filename = '%s/spf_events_ccd%s.fits'%(input_dir,ana_ccd_bins[ccd])
+    spf_filename = '%s/spf_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     spf_hdu_list = fits.open(spf_filename)
     spf_table = Table.read(spf_filename, hdu=1)
     for entry in range(0,len(spf_table)):
@@ -156,6 +168,7 @@ for ccd in range(0,len(ana_ccd_bins)):
         zscore = image_mask.get_bin_content(evt_detx,evt_dety)
         if zscore>ratio_cut: continue
         spectrum_spf.fill(evt_pi,weight=0.1)
+        detx_spf.fill(evt_detx,weight=0.1)
 
 fig, ax = plt.subplots()
 figsize_x = 8.
@@ -176,7 +189,7 @@ xmax = image_mask.xaxis.max()
 ymin = image_mask.yaxis.min()
 ymax = image_mask.yaxis.max()
 axbig.imshow(image_mask.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("%s/%s_image_mask.png"%(output_dir,on_obsID),bbox_inches='tight')
+fig.savefig("%s/%s_%s_image_mask.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
 fig.clf()
@@ -190,7 +203,7 @@ xmax = image_sci.xaxis.max()
 ymin = image_sci.yaxis.min()
 ymax = image_sci.yaxis.max()
 axbig.imshow(image_sci.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("%s/%s_image_sci.png"%(output_dir,on_obsID),bbox_inches='tight')
+fig.savefig("%s/%s_%s_image_sci.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
 fig.clf()
@@ -204,7 +217,7 @@ xmax = image_sci.xaxis.max()
 ymin = image_sci.yaxis.min()
 ymax = image_sci.yaxis.max()
 axbig.imshow(image_bkg.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("%s/%s_image_bkg.png"%(output_dir,on_obsID),bbox_inches='tight')
+fig.savefig("%s/%s_%s_image_bkg.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
 fig.clf()
@@ -217,7 +230,18 @@ axbig.set_yscale('log')
 #axbig.set_ylim(bottom=1)
 axbig.set_xlabel('Energy [eV]')
 axbig.legend(loc='best')
-fig.savefig("%s/%s_spectrum_model.png"%(output_dir,on_obsID),bbox_inches='tight')
+fig.savefig("%s/%s_%s_spectrum_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+axbig.remove()
+
+fig.clf()
+axbig = fig.add_subplot()
+axbig.errorbar(detx_sci.xaxis,detx_sci.yaxis,yerr=detx_sci.yerr,color='k',label='Data')
+axbig.plot(detx_qpb.xaxis,detx_qpb.yaxis,color='blue',label='QPB')
+axbig.plot(detx_spf.xaxis,detx_spf.yaxis,color='green',label='SPF')
+axbig.plot(detx_bkg.xaxis,detx_bkg.yaxis,color='red',label='Bkg')
+axbig.set_xlabel('DETX')
+axbig.legend(loc='best')
+fig.savefig("%s/%s_%s_detx_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
 fig.clf()
@@ -225,7 +249,7 @@ axbig = fig.add_subplot()
 axbig.plot(ratio_dist.xaxis,ratio_dist.yaxis)
 axbig.set_yscale('log')
 axbig.set_xlabel('Ratio')
-fig.savefig("%s/%s_ratio_dist.png"%(output_dir,on_obsID),bbox_inches='tight')
+fig.savefig("%s/%s_%s_ratio_dist.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
 #sci_filename = '../output_plots/sci_spectrum_sum.fits'
