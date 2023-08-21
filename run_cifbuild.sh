@@ -6,6 +6,8 @@ echo $SAS_ODF
 
 # Output file: ccf.cif
 
+rm -r analysis
+mkdir analysis
 cifbuild withccfpath=no analysisdate=now category=XMMCCF calindexset=$SAS_CCF fullpath=yes
 odfingest odfdir=$SAS_ODF outdir=$SAS_ODF
 

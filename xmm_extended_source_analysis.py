@@ -113,6 +113,115 @@ def SaveSpectrum(spec_input,filename):
     my_table = fits.BinTableHDU.from_columns([count,energy],name='SPECTRUM')
     my_table.writeto('%s/%s.fits'%(output_dir,filename), overwrite=True)
 
+def LoadCoordinateMatrix():
+
+    origin_filename = '../%s/%s/analysis/%s_esky2det.txt'%(on_sample,on_obsID,detector)
+    offset1_filename = '../%s/%s/analysis/%s_esky2det_offset1.txt'%(on_sample,on_obsID,detector)
+    offset2_filename = '../%s/%s/analysis/%s_esky2det_offset2.txt'%(on_sample,on_obsID,detector)
+    print ('read file: %s'%(origin_filename))
+    origin_det = [0,0]
+    origin_sky = [0,0]
+    offset1_det = [0,0]
+    offset1_sky = [0,0]
+    offset2_det = [0,0]
+    offset2_sky = [0,0]
+
+    origin_file = open(origin_filename)
+    last_line = False
+    for line in origin_file:
+        if last_line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            origin_det[0] = float(new_text_list[0])
+            origin_det[1] = float(new_text_list[1].strip('\n'))
+            break
+        if 'Source RA' in line:
+            origin_sky[0] = float(line.split(' ')[4])
+        if 'Source dec' in line:
+            origin_sky[1] = float(line.split(' ')[5])
+        if '# detX       detY' in line:
+            last_line = True
+
+    print ('origin_det = %s'%(origin_det))
+    print ('origin_sky = %s'%(origin_sky))
+
+    offset1_file = open(offset1_filename)
+    last_line = False
+    for line in offset1_file:
+        if last_line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset1_det[0] = float(new_text_list[0])
+            offset1_det[1] = float(new_text_list[1].strip('\n'))
+            break
+        if 'Source RA' in line:
+            offset1_sky[0] = float(line.split(' ')[4])
+        if 'Source dec' in line:
+            offset1_sky[1] = float(line.split(' ')[5])
+        if '# detX       detY' in line:
+            last_line = True
+
+    print ('offset1_det = %s'%(offset1_det))
+    print ('offset1_sky = %s'%(offset1_sky))
+
+    offset2_file = open(offset2_filename)
+    last_line = False
+    for line in offset2_file:
+        if last_line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset2_det[0] = float(new_text_list[0])
+            offset2_det[1] = float(new_text_list[1].strip('\n'))
+            break
+        if 'Source RA' in line:
+            offset2_sky[0] = float(line.split(' ')[4])
+        if 'Source dec' in line:
+            offset2_sky[1] = float(line.split(' ')[5])
+        if '# detX       detY' in line:
+            last_line = True
+
+    print ('offset2_det = %s'%(offset2_det))
+    print ('offset2_sky = %s'%(offset2_sky))
+
+    mtx_delta_sky = np.matrix([ [offset1_sky[0]-origin_sky[0], offset1_sky[1]-origin_sky[1]] , [offset2_sky[0]-origin_sky[0], offset2_sky[1]-origin_sky[1]] ])
+    mtx_delta_det = np.matrix([ [offset1_det[0]-origin_det[0], offset1_det[1]-origin_det[1]] , [offset2_det[0]-origin_det[0], offset2_det[1]-origin_det[1]] ])
+
+    inv_mtx_delta_det = inv(mtx_delta_det)
+    mtx_conv_det_2_sky = np.matmul(mtx_delta_sky,inv_mtx_delta_det)
+
+    return origin_sky, origin_det, mtx_conv_det_2_sky
+
+    #origin_sky = np.array(origin_sky)
+    #offset1_sky = np.array(offset1_sky)
+    #origin_det = np.array(origin_det)
+    #offset1_det = np.array(offset1_det)
+
+    #delta_det = offset1_det-origin_det
+    #delta_sky = np.matmul(mtx_conv_det_2_sky,delta_det)
+    #conv_sky = delta_sky+origin_sky
+    #print (conv_sky)
+
+def ConvertDet2Sky(target_det,origin_sky,origin_det,mtx_conv_det_2_sky):
+
+    target_det = np.array(target_det)
+    origin_sky = np.array(origin_sky)
+    origin_det = np.array(origin_det)
+
+    delta_det = target_det-origin_det
+    delta_sky = np.matmul(mtx_conv_det_2_sky,delta_det)
+    target_sky = delta_sky+origin_sky
+
+    return target_sky[0,0], target_sky[0,1]
+
 def get_conversion_mtx():
     radec_filename = '../%s/%s/analysis/pointing_coord.txt'%(on_sample,on_obsID)
     detxy_filename = '../%s/%s/analysis/det_coord_%s.txt'%(on_sample,on_obsID,detector)
@@ -156,6 +265,8 @@ def get_conversion_mtx():
     att_radec = [delta_att_radec[0,0]+ref_ra[0], delta_att_radec[0,1]+ref_dec[0]]
 
     return att_radec, mtx_conv_sky_2_det, mtx_conv_det_2_sky
+
+ref_sky, ref_det, mtx_det_2_sky = LoadCoordinateMatrix()
 
 #global_att_radec, global_mtx_conv_sky_2_det, global_mtx_conv_det_2_sky = get_conversion_mtx()
 #
@@ -213,6 +324,8 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=Fa
 
     evt_detx_list = []
     evt_dety_list = []
+    evt_ra_list = []
+    evt_dec_list = []
     evt_pi_list = []
 
     for evt in range(0,len(events)):
@@ -303,8 +416,12 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=Fa
         if not 'cor-evt' in filename and not ccd_id==0:
             if evt_ccd_id!=ccd_id: continue
 
+        evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky,ref_det,mtx_det_2_sky)
+
         evt_detx_list += [evt_detx]
         evt_dety_list += [evt_dety]
+        evt_ra_list += [evt_ra]
+        evt_dec_list += [evt_dec]
         evt_pi_list += [evt_pi]
 
         evt_count += 1.
@@ -321,9 +438,14 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=Fa
     if write_events:
         col_detx = fits.Column(name='DETX', array=evt_detx_list, format='D')
         col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
+        col_ra = fits.Column(name='RA', array=evt_ra_list, format='D')
+        col_dec = fits.Column(name='DEC', array=evt_dec_list, format='D')
         col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
-        my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
+        my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
+        my_table.header['REF_RA'] = ref_sky[0]
+        my_table.header['REF_DEC'] = ref_sky[1]
         my_table.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
+        #fits.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), my_table, overwrite=True)
 
     return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array]
 
@@ -1284,21 +1406,30 @@ for ccd in range(0,len(ana_ccd_bins)):
 
     evt_detx_list = []
     evt_dety_list = []
+    evt_ra_list = []
+    evt_dec_list = []
     evt_pi_list = []
     for idx_x in range(0,len(ana_output_image[1].xaxis)):
         for idx_y in range(0,len(ana_output_image[1].yaxis)):
-            evt_detx = ana_output_image[1].xaxis[idx_x]
-            evt_dety = ana_output_image[1].yaxis[idx_y]
+            pix_detx = ana_output_image[1].xaxis[idx_x]
+            pix_dety = ana_output_image[1].yaxis[idx_y]
             sum_bkg = ana_output_image[1].zaxis[idx_x,idx_y]
-            evt_pi = np.random.choice(a=prob_bkg_spectrum.xaxis, size=int(sum_bkg*10), p=prob_bkg_spectrum.yaxis)
-            for evt in range(0,len(evt_pi)):
+            for evt in range(0,int(10*sum_bkg)):
+                evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
+                evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
+                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky,ref_det,mtx_det_2_sky)
+                evt_pi = np.random.choice(a=prob_bkg_spectrum.xaxis, p=prob_bkg_spectrum.yaxis)
                 evt_detx_list += [evt_detx]
                 evt_dety_list += [evt_dety]
-                evt_pi_list += [evt_pi[evt]]
+                evt_ra_list += [evt_ra]
+                evt_dec_list += [evt_dec]
+                evt_pi_list += [evt_pi]
     col_detx = fits.Column(name='DETX', array=evt_detx_list, format='D')
     col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
+    col_ra = fits.Column(name='RA', array=evt_ra_list, format='D')
+    col_dec = fits.Column(name='DEC', array=evt_dec_list, format='D')
     col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
-    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
+    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
     my_table.writeto('%s/bkg_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     prob_spf_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
@@ -1307,21 +1438,30 @@ for ccd in range(0,len(ana_ccd_bins)):
 
     evt_detx_list = []
     evt_dety_list = []
+    evt_ra_list = []
+    evt_dec_list = []
     evt_pi_list = []
     for idx_x in range(0,len(ana_output_image[2].xaxis)):
         for idx_y in range(0,len(ana_output_image[2].yaxis)):
-            evt_detx = ana_output_image[2].xaxis[idx_x]
-            evt_dety = ana_output_image[2].yaxis[idx_y]
+            pix_detx = ana_output_image[2].xaxis[idx_x]
+            pix_dety = ana_output_image[2].yaxis[idx_y]
             sum_bkg = ana_output_image[2].zaxis[idx_x,idx_y]
-            evt_pi = np.random.choice(a=prob_spf_spectrum.xaxis, size=int(sum_bkg*10), p=prob_spf_spectrum.yaxis)
-            for evt in range(0,len(evt_pi)):
+            for evt in range(0,int(10*sum_bkg)):
+                evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
+                evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
+                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky,ref_det,mtx_det_2_sky)
+                evt_pi = np.random.choice(a=prob_bkg_spectrum.xaxis, p=prob_bkg_spectrum.yaxis)
                 evt_detx_list += [evt_detx]
                 evt_dety_list += [evt_dety]
-                evt_pi_list += [evt_pi[evt]]
+                evt_ra_list += [evt_ra]
+                evt_dec_list += [evt_dec]
+                evt_pi_list += [evt_pi]
     col_detx = fits.Column(name='DETX', array=evt_detx_list, format='D')
     col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
+    col_ra = fits.Column(name='RA', array=evt_ra_list, format='D')
+    col_dec = fits.Column(name='DEC', array=evt_dec_list, format='D')
     col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
-    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
+    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
     my_table.writeto('%s/spf_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     prob_qpb_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
@@ -1330,21 +1470,30 @@ for ccd in range(0,len(ana_ccd_bins)):
 
     evt_detx_list = []
     evt_dety_list = []
+    evt_ra_list = []
+    evt_dec_list = []
     evt_pi_list = []
     for idx_x in range(0,len(ana_output_image[3].xaxis)):
         for idx_y in range(0,len(ana_output_image[3].yaxis)):
-            evt_detx = ana_output_image[3].xaxis[idx_x]
-            evt_dety = ana_output_image[3].yaxis[idx_y]
+            pix_detx = ana_output_image[3].xaxis[idx_x]
+            pix_dety = ana_output_image[3].yaxis[idx_y]
             sum_bkg = ana_output_image[3].zaxis[idx_x,idx_y]
-            evt_pi = np.random.choice(a=prob_qpb_spectrum.xaxis, size=int(sum_bkg*10), p=prob_qpb_spectrum.yaxis)
-            for evt in range(0,len(evt_pi)):
+            for evt in range(0,int(10*sum_bkg)):
+                evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
+                evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
+                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky,ref_det,mtx_det_2_sky)
+                evt_pi = np.random.choice(a=prob_bkg_spectrum.xaxis, p=prob_bkg_spectrum.yaxis)
                 evt_detx_list += [evt_detx]
                 evt_dety_list += [evt_dety]
-                evt_pi_list += [evt_pi[evt]]
+                evt_ra_list += [evt_ra]
+                evt_dec_list += [evt_dec]
+                evt_pi_list += [evt_pi]
     col_detx = fits.Column(name='DETX', array=evt_detx_list, format='D')
     col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
+    col_ra = fits.Column(name='RA', array=evt_ra_list, format='D')
+    col_dec = fits.Column(name='DEC', array=evt_dec_list, format='D')
     col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
-    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_pi],name='EVENT')
+    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
     my_table.writeto('%s/qpb_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     sci_spectrum_sum.add(ana_output_spectrum[0])

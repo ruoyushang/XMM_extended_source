@@ -15,8 +15,8 @@ echo $mos2_fits
 
 mos1_fits=$(ls P*M1S001MIEVL*)
 mos2_fits=$(ls P*M2S002MIEVL*)
-#mos1_fits=$(ls P*M1S002MIEVL*)
-#mos2_fits=$(ls P*M2S003MIEVL*)
+#mos1_fits=$(ls P*M1S006MIEVL*)
+#mos2_fits=$(ls P*M2S007MIEVL*)
 echo "Copy files:"
 echo $mos1_fits
 echo $mos2_fits

@@ -17,24 +17,16 @@ detx_scale = 500
 detr_low = 0
 detr_high = 20000
 detr_scale = 500
-sky_ra_low = 0
-sky_ra_high = 0.5
-sky_dec_low = 0
-sky_dec_high = 0.5
-sky_scale = 0.001
+sky_ra_low = -0.28
+sky_ra_high = 0.28
+sky_dec_low = -0.28
+sky_dec_high = 0.28
+sky_scale = 500.*0.05/(60.*60.)
 
 
 class MyArray2D:
 
-    def __init__(self,coord='det',pixel_scale=200):
-        start_x = -19474.5
-        start_y = -19474.5
-        image_size = 39000
-        if coord=='radec':
-            start_x = sky_ra_low
-            start_y = sky_dec_low
-            pixel_scale = sky_scale
-            image_size = 0.5
+    def __init__(self,start_x=-19474.5,start_y=-19474.5,image_size=39000,pixel_scale=200):
         nrows = int(image_size/pixel_scale)
         ncols = int(image_size/pixel_scale)
         array_shape = (nrows,ncols)

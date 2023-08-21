@@ -1,6 +1,9 @@
 import sys
 from astropy.io import fits
 from astropy.table import Table
+from astropy import units as my_unit
+from astropy.coordinates import SkyCoord
+from astropy.coordinates import ICRS, Galactic, FK4, FK5  # Low-level frames
 import numpy as np
 from scipy.optimize import least_squares
 from scipy.optimize import curve_fit
@@ -19,13 +22,13 @@ import common_functions
 #on_obsID = 'ID0827251001'
 #on_obsID = 'ID0827251101'
 
-#on_sample = 'Cas_A'
+on_sample = 'Cas_A'
 #on_obsID = 'ID0412180101'
-#on_obsID = 'ID0400210101' # Cas A Northern lobe
+on_obsID = 'ID0400210101' # Cas A Northern lobe
 #on_obsID = 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
 
-on_sample = '3HWC_J1928_p178'
-on_obsID = 'ID0902120101'
+#on_sample = '3HWC_J1928_p178'
+#on_obsID = 'ID0902120101'
 
 #detector = 'mos1'
 detector = 'mos2'
@@ -35,8 +38,8 @@ ana_ccd_bins = [0]
 
 exclusion_bins = 0
 energy_cut = 2000
-ratio_cut = 0.75
-#ratio_cut = 1e10
+#ratio_cut = 0.75
+ratio_cut = 1e10
 
 MyArray1D = common_functions.MyArray1D
 MyArray2D = common_functions.MyArray2D
@@ -61,12 +64,23 @@ sky_dec_low = common_functions.sky_dec_low
 sky_dec_high = common_functions.sky_dec_high
 sky_scale = common_functions.sky_scale
 
+def ConvertGalacticToRaDec(l, b):
+    my_sky = SkyCoord(l*my_unit.deg, b*my_unit.deg, frame='galactic')
+    return my_sky.icrs.ra.deg, my_sky.icrs.dec.deg
+
+def ConvertRaDecToGalactic(ra, dec):
+    my_sky = SkyCoord(ra*my_unit.deg, dec*my_unit.deg, frame='icrs')
+    return my_sky.galactic.l.deg, my_sky.galactic.b.deg
+
+sky_ra_center = 0.
+sky_dec_center = 0.
+
 input_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
 output_dir = '/Users/rshang/xmm_analysis/output_plots/'
 
-image_mask = MyArray2D(pixel_scale=1000)
-image_sci = MyArray2D(pixel_scale=1000)
-image_bkg = MyArray2D(pixel_scale=1000)
+image_det_mask = MyArray2D(pixel_scale=1000)
+image_det_sci = MyArray2D(pixel_scale=1000)
+image_det_bkg = MyArray2D(pixel_scale=1000)
 for ccd in range(0,len(ana_ccd_bins)):
 
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
@@ -78,7 +92,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_dety = sci_table[entry]['DETY']
         if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
         if evt_pi<energy_cut: continue
-        image_sci.fill(evt_detx,evt_dety)
+        image_det_sci.fill(evt_detx,evt_dety)
+
+    sky_ra_center = sci_hdu_list[1].header['REF_RA']
+    sky_dec_center = sci_hdu_list[1].header['REF_DEC']
+    sky_l_center, sky_b_center = ConvertRaDecToGalactic(sky_ra_center, sky_dec_center)
 
     bkg_filename = '%s/bkg_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     bkg_hdu_list = fits.open(bkg_filename)
@@ -89,27 +107,38 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_dety = bkg_table[entry]['DETY']
         if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
         if evt_pi<energy_cut: continue
-        image_bkg.fill(evt_detx,evt_dety,weight=0.1)
+        image_det_bkg.fill(evt_detx,evt_dety,weight=0.1)
 
-image_mask.calc_ratio(image_sci,image_bkg)
+sky_ra_low = sky_ra_center-0.28
+sky_ra_high = sky_ra_center+0.28
+sky_dec_low = sky_dec_center-0.28
+sky_dec_high = sky_dec_center+0.28
+sky_l_low = sky_l_center-0.28
+sky_l_high = sky_l_center+0.28
+sky_b_low = sky_b_center-0.28
+sky_b_high = sky_b_center+0.28
+
+image_det_mask.calc_ratio(image_det_sci,image_det_bkg)
 ratio_dist = MyArray1D(bin_start=-1.,bin_end=3.,pixel_scale=0.1)
-for idx_x in range(0,len(image_mask.xaxis)):
-    for idx_y in range(0,len(image_mask.yaxis)):
-        content = image_mask.zaxis[idx_x,idx_y]
+for idx_x in range(0,len(image_det_mask.xaxis)):
+    for idx_y in range(0,len(image_det_mask.yaxis)):
+        content = image_det_mask.zaxis[idx_x,idx_y]
         if content==0.: continue
         ratio_dist.fill(content)
 
 
-image_sci = MyArray2D()
-image_bkg = MyArray2D()
+image_det_sci = MyArray2D()
+image_det_bkg = MyArray2D()
+image_icrs_sci = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=0.56,pixel_scale=500.*0.05/(60.*60.))
+image_galactic_sci = MyArray2D(start_x=sky_l_low,start_y=sky_b_low,image_size=0.56,pixel_scale=500.*0.05/(60.*60.))
 spectrum_sci = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 spectrum_bkg = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 spectrum_qpb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 spectrum_spf = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-detx_sci = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=2.*detx_scale)
-detx_bkg = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=2.*detx_scale)
-detx_qpb = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=2.*detx_scale)
-detx_spf = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=2.*detx_scale)
+detx_sci = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+detx_bkg = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+detx_qpb = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+detx_spf = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
 for ccd in range(0,len(ana_ccd_bins)):
 
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
@@ -119,11 +148,16 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_pi = sci_table[entry]['PI']
         evt_detx = sci_table[entry]['DETX']
         evt_dety = sci_table[entry]['DETY']
+        evt_ra = sci_table[entry]['RA']
+        evt_dec = sci_table[entry]['DEC']
+        evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
         if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
         if evt_pi<energy_cut: continue
-        zscore = image_mask.get_bin_content(evt_detx,evt_dety)
+        zscore = image_det_mask.get_bin_content(evt_detx,evt_dety)
         if zscore>ratio_cut: continue
-        image_sci.fill(evt_detx,evt_dety)
+        image_det_sci.fill(evt_detx,evt_dety)
+        image_icrs_sci.fill(evt_ra,evt_dec)
+        image_galactic_sci.fill(evt_l,evt_b)
         spectrum_sci.fill(evt_pi)
         detx_sci.fill(evt_detx)
 
@@ -134,11 +168,13 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_pi = bkg_table[entry]['PI']
         evt_detx = bkg_table[entry]['DETX']
         evt_dety = bkg_table[entry]['DETY']
+        evt_ra = bkg_table[entry]['RA']
+        evt_dec = bkg_table[entry]['DEC']
         if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
         if evt_pi<energy_cut: continue
-        zscore = image_mask.get_bin_content(evt_detx,evt_dety)
+        zscore = image_det_mask.get_bin_content(evt_detx,evt_dety)
         if zscore>ratio_cut: continue
-        image_bkg.fill(evt_detx,evt_dety,weight=0.1)
+        image_det_bkg.fill(evt_detx,evt_dety,weight=0.1)
         spectrum_bkg.fill(evt_pi,weight=0.1)
         detx_bkg.fill(evt_detx,weight=0.1)
 
@@ -149,9 +185,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_pi = qpb_table[entry]['PI']
         evt_detx = qpb_table[entry]['DETX']
         evt_dety = qpb_table[entry]['DETY']
+        evt_ra = qpb_table[entry]['RA']
+        evt_dec = qpb_table[entry]['DEC']
         if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
         if evt_pi<energy_cut: continue
-        zscore = image_mask.get_bin_content(evt_detx,evt_dety)
+        zscore = image_det_mask.get_bin_content(evt_detx,evt_dety)
         if zscore>ratio_cut: continue
         spectrum_qpb.fill(evt_pi,weight=0.1)
         detx_qpb.fill(evt_detx,weight=0.1)
@@ -163,9 +201,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_pi = spf_table[entry]['PI']
         evt_detx = spf_table[entry]['DETX']
         evt_dety = spf_table[entry]['DETY']
+        evt_ra = spf_table[entry]['RA']
+        evt_dec = spf_table[entry]['DEC']
         if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
         if evt_pi<energy_cut: continue
-        zscore = image_mask.get_bin_content(evt_detx,evt_dety)
+        zscore = image_det_mask.get_bin_content(evt_detx,evt_dety)
         if zscore>ratio_cut: continue
         spectrum_spf.fill(evt_pi,weight=0.1)
         detx_spf.fill(evt_detx,weight=0.1)
@@ -184,12 +224,12 @@ label_x = 'DETY'
 label_y = 'DETX'
 axbig.set_xlabel(label_x)
 axbig.set_ylabel(label_y)
-xmin = image_mask.xaxis.min()
-xmax = image_mask.xaxis.max()
-ymin = image_mask.yaxis.min()
-ymax = image_mask.yaxis.max()
-axbig.imshow(image_mask.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("%s/%s_%s_image_mask.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+xmin = image_det_mask.xaxis.min()
+xmax = image_det_mask.xaxis.max()
+ymin = image_det_mask.yaxis.min()
+ymax = image_det_mask.yaxis.max()
+axbig.imshow(image_det_mask.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+fig.savefig("%s/%s_%s_image_det_mask.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
 fig.clf()
@@ -198,12 +238,40 @@ label_x = 'DETY'
 label_y = 'DETX'
 axbig.set_xlabel(label_x)
 axbig.set_ylabel(label_y)
-xmin = image_sci.xaxis.min()
-xmax = image_sci.xaxis.max()
-ymin = image_sci.yaxis.min()
-ymax = image_sci.yaxis.max()
-axbig.imshow(image_sci.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("%s/%s_%s_image_sci.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+xmin = image_det_sci.xaxis.min()
+xmax = image_det_sci.xaxis.max()
+ymin = image_det_sci.yaxis.min()
+ymax = image_det_sci.yaxis.max()
+axbig.imshow(image_det_sci.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+fig.savefig("%s/%s_%s_image_det_sci.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+axbig.remove()
+
+fig.clf()
+axbig = fig.add_subplot()
+label_x = 'RA'
+label_y = 'DEC'
+axbig.set_xlabel(label_x)
+axbig.set_ylabel(label_y)
+xmin = image_icrs_sci.xaxis.min()
+xmax = image_icrs_sci.xaxis.max()
+ymin = image_icrs_sci.yaxis.min()
+ymax = image_icrs_sci.yaxis.max()
+axbig.imshow(image_icrs_sci.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+fig.savefig("%s/%s_%s_image_icrs_sci.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+axbig.remove()
+
+fig.clf()
+axbig = fig.add_subplot()
+label_x = 'Gal. l'
+label_y = 'Gal. b'
+axbig.set_xlabel(label_x)
+axbig.set_ylabel(label_y)
+xmin = image_galactic_sci.xaxis.min()
+xmax = image_galactic_sci.xaxis.max()
+ymin = image_galactic_sci.yaxis.min()
+ymax = image_galactic_sci.yaxis.max()
+axbig.imshow(image_galactic_sci.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+fig.savefig("%s/%s_%s_image_galactic_sci.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
 fig.clf()
@@ -212,12 +280,12 @@ label_x = 'DETY'
 label_y = 'DETX'
 axbig.set_xlabel(label_x)
 axbig.set_ylabel(label_y)
-xmin = image_sci.xaxis.min()
-xmax = image_sci.xaxis.max()
-ymin = image_sci.yaxis.min()
-ymax = image_sci.yaxis.max()
-axbig.imshow(image_bkg.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-fig.savefig("%s/%s_%s_image_bkg.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+xmin = image_det_sci.xaxis.min()
+xmax = image_det_sci.xaxis.max()
+ymin = image_det_sci.yaxis.min()
+ymax = image_det_sci.yaxis.max()
+axbig.imshow(image_det_bkg.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+fig.savefig("%s/%s_%s_image_det_bkg.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
 fig.clf()

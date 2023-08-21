@@ -25,7 +25,7 @@ emchain
 # In the file name, the segment number (like S001) follows directly after the ‘PN’. 
 # An even easier way to determine how many pn segments there are is to type “epchain exposure=99”; you will get a list of pn segments
 #
-#epchain exposure=99
+epchain exposure=99
 
 #epchain
 #pn_fits=$(ls P*PN*PIEVL*)

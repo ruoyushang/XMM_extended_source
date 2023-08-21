@@ -85,6 +85,8 @@ evselect table=mos1-fwc-evt.fits withfilteredset=yes filtertype=expression expre
 evselect table=mos2-fwc-evt.fits withfilteredset=yes filtertype=expression expression="$em_fwc_cor_cut" filteredset=mos2-fwc-cor-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
 
 
+evselect table=mos1-fov-evt.fits withimageset=yes imageset=mos1-fov-img.fits xcolumn=DETX ycolumn=DETY imagebinning=imageSize ximagesize=600 ximagemax=19500 ximagemin=-19499 yimagesize=600 yimagemax=19500 yimagemin=-19499
+evselect table=mos2-fov-evt.fits withimageset=yes imageset=mos2-fov-img.fits xcolumn=DETX ycolumn=DETY imagebinning=imageSize ximagesize=600 ximagemax=19500 ximagemin=-19499 yimagesize=600 yimagemax=19500 yimagemin=-19499
 
 # to view the image
 # imgdisplay withimagefile=true imagefile=mos1image_src_filt.fits
