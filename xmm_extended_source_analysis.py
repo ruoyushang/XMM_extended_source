@@ -45,6 +45,8 @@ sky_ra_high = common_functions.sky_ra_high
 sky_dec_low = common_functions.sky_dec_low
 sky_dec_high = common_functions.sky_dec_high
 sky_scale = common_functions.sky_scale
+find_nearest_ref_det_idx = common_functions.find_nearest_ref_det_idx
+LoadCoordinateMatrix = common_functions.LoadCoordinateMatrix
 
 
 fig, ax = plt.subplots()
@@ -58,8 +60,8 @@ on_obsID = sys.argv[2]
 
 diagnostic_plots = True
 #diagnostic_plots = False
-#fast_test = True
-fast_test = False
+fast_test = True
+#fast_test = False
 
 #detector = 'mos1'
 #detector = 'mos2'
@@ -125,126 +127,6 @@ def SaveSpectrum(spec_input,filename):
     my_table = fits.BinTableHDU.from_columns([count,energy],name='SPECTRUM')
     my_table.writeto('%s/%s.fits'%(output_dir,filename), overwrite=True)
 
-def LoadCoordinateMatrix():
-
-    origin_filename = '../%s/%s/analysis/%s_esky2det.txt'%(on_sample,on_obsID,detector)
-    offset1_filename = '../%s/%s/analysis/%s_esky2det_offset1.txt'%(on_sample,on_obsID,detector)
-    offset2_filename = '../%s/%s/analysis/%s_esky2det_offset2.txt'%(on_sample,on_obsID,detector)
-    print ('read file: %s'%(origin_filename))
-    origin_det = [0,0]
-    origin_sky = [0,0]
-    offset1_det = [0,0]
-    offset1_sky = [0,0]
-    offset2_det = [0,0]
-    offset2_sky = [0,0]
-
-    origin_file = open(origin_filename)
-    last_line = False
-    for line in origin_file:
-        if last_line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            origin_det[0] = float(new_text_list[0])
-            origin_det[1] = float(new_text_list[1].strip('\n'))
-            break
-        if 'Source RA' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            origin_sky[0] = float(new_text_list[4])
-        if 'Source dec' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            origin_sky[1] = float(new_text_list[4])
-        if '# detX       detY' in line:
-            last_line = True
-
-    print ('origin_det = %s'%(origin_det))
-    print ('origin_sky = %s'%(origin_sky))
-
-    offset1_file = open(offset1_filename)
-    last_line = False
-    for line in offset1_file:
-        if last_line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset1_det[0] = float(new_text_list[0])
-            offset1_det[1] = float(new_text_list[1].strip('\n'))
-            break
-        if 'Source RA' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset1_sky[0] = float(new_text_list[4])
-        if 'Source dec' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset1_sky[1] = float(new_text_list[4])
-        if '# detX       detY' in line:
-            last_line = True
-
-    print ('offset1_det = %s'%(offset1_det))
-    print ('offset1_sky = %s'%(offset1_sky))
-
-    offset2_file = open(offset2_filename)
-    last_line = False
-    for line in offset2_file:
-        if last_line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset2_det[0] = float(new_text_list[0])
-            offset2_det[1] = float(new_text_list[1].strip('\n'))
-            break
-        if 'Source RA' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset2_sky[0] = float(new_text_list[4])
-        if 'Source dec' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset2_sky[1] = float(new_text_list[4])
-        if '# detX       detY' in line:
-            last_line = True
-
-    print ('offset2_det = %s'%(offset2_det))
-    print ('offset2_sky = %s'%(offset2_sky))
-
-    mtx_delta_sky = np.matrix([ [offset1_sky[0]-origin_sky[0], offset1_sky[1]-origin_sky[1]] , [offset2_sky[0]-origin_sky[0], offset2_sky[1]-origin_sky[1]] ])
-    mtx_delta_det = np.matrix([ [offset1_det[0]-origin_det[0], offset1_det[1]-origin_det[1]] , [offset2_det[0]-origin_det[0], offset2_det[1]-origin_det[1]] ])
-
-    inv_mtx_delta_sky = inv(mtx_delta_sky)
-    mtx_conv_sky_2_det = np.matmul(mtx_delta_det,inv_mtx_delta_sky)
-    inv_mtx_delta_det = inv(mtx_delta_det)
-    mtx_conv_det_2_sky = np.matmul(mtx_delta_sky,inv_mtx_delta_det)
-
-    return origin_sky, origin_det, mtx_conv_det_2_sky, mtx_conv_sky_2_det
-
-
 def ConvertDet2Sky(target_det,origin_sky,origin_det,mtx_conv_det_2_sky):
 
     target_det = np.array(target_det)
@@ -301,7 +183,24 @@ def get_conversion_mtx():
 
     return att_radec, mtx_conv_sky_2_det, mtx_conv_det_2_sky
 
-ref_sky, ref_det, mtx_det_2_sky, mtx_sky_2_det = LoadCoordinateMatrix()
+ref_sky = []
+ref_det = []
+mtx_det_2_sky = []
+mtx_sky_2_det = []
+for idx_ra in range(0,1):
+    for idx_dec in range(0,1):
+        ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID,detector)
+        ref_sky += [ref_sky_local]
+        ref_det += [ref_det_local]
+        mtx_det_2_sky += [mtx_det_2_sky_local]
+        mtx_sky_2_det += [mtx_sky_2_det_local]
+if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
+    ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(97,97,on_sample,on_obsID,detector)
+    ref_sky += [ref_sky_local]
+    ref_det += [ref_det_local]
+    mtx_det_2_sky += [mtx_det_2_sky_local]
+    mtx_sky_2_det += [mtx_sky_2_det_local]
+
 
 #global_att_radec, global_mtx_conv_sky_2_det, global_mtx_conv_det_2_sky = get_conversion_mtx()
 #
@@ -454,7 +353,11 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=Fa
         if not 'cor-evt' in filename and not ccd_id==0:
             if evt_ccd_id!=ccd_id: continue
 
-        evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky,ref_det,mtx_det_2_sky)
+        #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
+        ref_det_idx = 0
+        if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
+            ref_det_idx = 1
+        evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
         #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
 
         evt_detx_list += [evt_detx]
@@ -486,8 +389,8 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=Fa
         col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
         #my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_l,col_b,col_pi],name='EVENT')
         my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
-        my_table.header['REF_RA'] = ref_sky[0]
-        my_table.header['REF_DEC'] = ref_sky[1]
+        my_table.header['REF_RA'] = ref_sky[0][0]
+        my_table.header['REF_DEC'] = ref_sky[0][1]
         my_table.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
         #fits.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), my_table, overwrite=True)
 
@@ -1588,7 +1491,11 @@ for ccd in range(0,len(ana_ccd_bins)):
             for evt in range(0,int(10*sum_bkg)):
                 evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
                 evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
-                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky,ref_det,mtx_det_2_sky)
+                #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
+                ref_det_idx = 0
+                if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
+                    ref_det_idx = 1
+                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
                 #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
                 evt_pi = np.random.choice(a=prob_bkg_spectrum.xaxis, p=prob_bkg_spectrum.yaxis)
                 evt_detx_list += [evt_detx]
@@ -1628,7 +1535,11 @@ for ccd in range(0,len(ana_ccd_bins)):
             for evt in range(0,int(10*sum_bkg)):
                 evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
                 evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
-                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky,ref_det,mtx_det_2_sky)
+                #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
+                ref_det_idx = 0
+                if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
+                    ref_det_idx = 1
+                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
                 #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
                 evt_pi = np.random.choice(a=prob_spf_spectrum.xaxis, p=prob_spf_spectrum.yaxis)
                 evt_detx_list += [evt_detx]
@@ -1668,7 +1579,11 @@ for ccd in range(0,len(ana_ccd_bins)):
             for evt in range(0,int(10*sum_bkg)):
                 evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
                 evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
-                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky,ref_det,mtx_det_2_sky)
+                #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
+                ref_det_idx = 0
+                if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
+                    ref_det_idx = 1
+                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
                 #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
                 evt_pi = np.random.choice(a=prob_qpb_spectrum.xaxis, p=prob_qpb_spectrum.yaxis)
                 evt_detx_list += [evt_detx]

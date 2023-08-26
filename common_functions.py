@@ -1,5 +1,6 @@
 
 import numpy as np
+from numpy.linalg import inv
 import math
 
 pattern_low = 0
@@ -222,4 +223,170 @@ class MyArray1D:
                 self.yaxis[idx_x] = z_score
             else:
                 self.yaxis[idx_x] = -z_score
+
+def find_nearest_ref_det_idx(target_det,ref_det_list):
+
+    min_dist = 1e10
+    min_dist_idx_x = 0
+    for idx_x in range(0,10):
+        dist = abs(target_det[0]-ref_det_list[idx_x][0])
+        if min_dist>dist:
+            min_dist = dist
+            min_dist_idx_x = idx_x
+
+    min_dist = 1e10
+    min_dist_idx_y = 0
+    for idx_y in range(0,10):
+        dist = abs(target_det[1]-ref_det_list[idx_y][1])
+        if min_dist>dist:
+            min_dist = dist
+            min_dist_idx_y = idx_y
+
+    return min_dist_idx_x, min_dist_idx_y
+
+def find_nearest_ref_sky_idx(target_sky,ref_sky_list):
+
+    min_dist = 1e10
+    min_dist_idx_x = 0
+    for idx_x in range(0,len(ref_sky_list)):
+        dist = abs(target_sky[0]-ref_sky_list[idx_x][0])
+        if min_dist>dist:
+            min_dist = dist
+            min_dist_idx_x = idx_x
+
+    min_dist = 1e10
+    min_dist_idx_y = 0
+    for idx_y in range(0,len(ref_sky_list)):
+        dist = abs(target_sky[1]-ref_sky_list[idx_y][1])
+        if min_dist>dist:
+            min_dist = dist
+            min_dist_idx_y = idx_y
+
+    return min_dist_idx_x, min_dist_idx_y
+
+
+def LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID,detector):
+
+    idx_ra_offset1 = idx_ra+1
+    idx_dec_offset1 = idx_dec+0
+    idx_ra_offset2 = idx_ra+0
+    idx_dec_offset2 = idx_dec+1
+
+    origin_filename = '../%s/%s/analysis/sky_det_ref/%s_esky2det_ra_%s_dec_%s.txt'%(on_sample,on_obsID,detector,idx_ra,idx_dec)
+    offset1_filename = '../%s/%s/analysis/sky_det_ref/%s_esky2det_ra_%s_dec_%s.txt'%(on_sample,on_obsID,detector,idx_ra_offset1,idx_dec_offset1)
+    offset2_filename = '../%s/%s/analysis/sky_det_ref/%s_esky2det_ra_%s_dec_%s.txt'%(on_sample,on_obsID,detector,idx_ra_offset2,idx_dec_offset2)
+    #print ('read file: %s'%(origin_filename))
+
+    origin_det = [0,0]
+    origin_sky = [0,0]
+    offset1_det = [0,0]
+    offset1_sky = [0,0]
+    offset2_det = [0,0]
+    offset2_sky = [0,0]
+
+    origin_file = open(origin_filename)
+    last_line = False
+    for line in origin_file:
+        if last_line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            origin_det[0] = float(new_text_list[0])
+            origin_det[1] = float(new_text_list[1].strip('\n'))
+            break
+        if 'Source RA' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            origin_sky[0] = float(new_text_list[4])
+        if 'Source dec' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            origin_sky[1] = float(new_text_list[4])
+        if '# detX       detY' in line:
+            last_line = True
+
+    #print ('origin_det = %s'%(origin_det))
+    #print ('origin_sky = %s'%(origin_sky))
+
+    offset1_file = open(offset1_filename)
+    last_line = False
+    for line in offset1_file:
+        if last_line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset1_det[0] = float(new_text_list[0])
+            offset1_det[1] = float(new_text_list[1].strip('\n'))
+            break
+        if 'Source RA' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset1_sky[0] = float(new_text_list[4])
+        if 'Source dec' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset1_sky[1] = float(new_text_list[4])
+        if '# detX       detY' in line:
+            last_line = True
+
+    #print ('offset1_det = %s'%(offset1_det))
+    #print ('offset1_sky = %s'%(offset1_sky))
+
+    offset2_file = open(offset2_filename)
+    last_line = False
+    for line in offset2_file:
+        if last_line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset2_det[0] = float(new_text_list[0])
+            offset2_det[1] = float(new_text_list[1].strip('\n'))
+            break
+        if 'Source RA' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset2_sky[0] = float(new_text_list[4])
+        if 'Source dec' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset2_sky[1] = float(new_text_list[4])
+        if '# detX       detY' in line:
+            last_line = True
+
+    #print ('offset2_det = %s'%(offset2_det))
+    #print ('offset2_sky = %s'%(offset2_sky))
+
+    mtx_delta_sky = np.matrix([ [offset1_sky[0]-origin_sky[0], offset1_sky[1]-origin_sky[1]] , [offset2_sky[0]-origin_sky[0], offset2_sky[1]-origin_sky[1]] ])
+    mtx_delta_det = np.matrix([ [offset1_det[0]-origin_det[0], offset1_det[1]-origin_det[1]] , [offset2_det[0]-origin_det[0], offset2_det[1]-origin_det[1]] ])
+
+    inv_mtx_delta_sky = inv(mtx_delta_sky)
+    mtx_conv_sky_2_det = np.matmul(mtx_delta_det,inv_mtx_delta_sky)
+    inv_mtx_delta_det = inv(mtx_delta_det)
+    mtx_conv_det_2_sky = np.matmul(mtx_delta_sky,inv_mtx_delta_det)
+
+    return origin_sky, origin_det, mtx_conv_det_2_sky, mtx_conv_sky_2_det
 

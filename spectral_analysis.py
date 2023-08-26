@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 
 import common_functions
 
-on_sample = 'extragalactic'
-on_obsID = 'ID0505460501'
+#on_sample = 'extragalactic'
+#on_obsID = 'ID0505460501'
 #on_obsID = 'ID0690900101'
 #on_obsID = 'ID0803160301'
 #on_obsID = 'ID0820560101'
@@ -23,8 +23,8 @@ on_obsID = 'ID0505460501'
 #on_obsID = 'ID0827251001'
 #on_obsID = 'ID0827251101'
 
-#on_sample = 'Cas_A'
-#on_obsID = 'ID0412180101'
+on_sample = 'Cas_A'
+on_obsID = 'ID0412180101'
 #on_obsID = 'ID0400210101' # Cas A Northern lobe
 #on_obsID = 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
 
@@ -37,10 +37,12 @@ detector = 'mos2'
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 
-exclusion_inner = 0.
+#exclusion_inner = 0.
 #exclusion_outer = 0.15
-#exclusion_inner = 0.15
+exclusion_inner = 0.15
 exclusion_outer = 1e10
+
+point_source_cut = False
 
 energy_cut = 2000
 
@@ -71,125 +73,8 @@ sky_ra_high = common_functions.sky_ra_high
 sky_dec_low = common_functions.sky_dec_low
 sky_dec_high = common_functions.sky_dec_high
 sky_scale = common_functions.sky_scale
-
-def LoadCoordinateMatrix():
-
-    origin_filename = '../%s/%s/analysis/%s_esky2det.txt'%(on_sample,on_obsID,detector)
-    offset1_filename = '../%s/%s/analysis/%s_esky2det_offset1.txt'%(on_sample,on_obsID,detector)
-    offset2_filename = '../%s/%s/analysis/%s_esky2det_offset2.txt'%(on_sample,on_obsID,detector)
-    print ('read file: %s'%(origin_filename))
-    origin_det = [0,0]
-    origin_sky = [0,0]
-    offset1_det = [0,0]
-    offset1_sky = [0,0]
-    offset2_det = [0,0]
-    offset2_sky = [0,0]
-
-    origin_file = open(origin_filename)
-    last_line = False
-    for line in origin_file:
-        if last_line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            origin_det[0] = float(new_text_list[0])
-            origin_det[1] = float(new_text_list[1].strip('\n'))
-            break
-        if 'Source RA' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            origin_sky[0] = float(new_text_list[4])
-        if 'Source dec' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            origin_sky[1] = float(new_text_list[4])
-        if '# detX       detY' in line:
-            last_line = True
-
-    print ('origin_det = %s'%(origin_det))
-    print ('origin_sky = %s'%(origin_sky))
-
-    offset1_file = open(offset1_filename)
-    last_line = False
-    for line in offset1_file:
-        if last_line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset1_det[0] = float(new_text_list[0])
-            offset1_det[1] = float(new_text_list[1].strip('\n'))
-            break
-        if 'Source RA' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset1_sky[0] = float(new_text_list[4])
-        if 'Source dec' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset1_sky[1] = float(new_text_list[4])
-        if '# detX       detY' in line:
-            last_line = True
-
-    print ('offset1_det = %s'%(offset1_det))
-    print ('offset1_sky = %s'%(offset1_sky))
-
-    offset2_file = open(offset2_filename)
-    last_line = False
-    for line in offset2_file:
-        if last_line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset2_det[0] = float(new_text_list[0])
-            offset2_det[1] = float(new_text_list[1].strip('\n'))
-            break
-        if 'Source RA' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset2_sky[0] = float(new_text_list[4])
-        if 'Source dec' in line:
-            text_list = line.split(' ')
-            new_text_list = []
-            for entry in text_list:
-                if entry!='':
-                    new_text_list += [entry]
-            offset2_sky[1] = float(new_text_list[4])
-        if '# detX       detY' in line:
-            last_line = True
-
-    print ('offset2_det = %s'%(offset2_det))
-    print ('offset2_sky = %s'%(offset2_sky))
-
-    mtx_delta_sky = np.matrix([ [offset1_sky[0]-origin_sky[0], offset1_sky[1]-origin_sky[1]] , [offset2_sky[0]-origin_sky[0], offset2_sky[1]-origin_sky[1]] ])
-    mtx_delta_det = np.matrix([ [offset1_det[0]-origin_det[0], offset1_det[1]-origin_det[1]] , [offset2_det[0]-origin_det[0], offset2_det[1]-origin_det[1]] ])
-
-    inv_mtx_delta_sky = inv(mtx_delta_sky)
-    mtx_conv_sky_2_det = np.matmul(mtx_delta_det,inv_mtx_delta_sky)
-    inv_mtx_delta_det = inv(mtx_delta_det)
-    mtx_conv_det_2_sky = np.matmul(mtx_delta_sky,inv_mtx_delta_det)
-
-    return origin_sky, origin_det, mtx_conv_det_2_sky, mtx_conv_sky_2_det
+find_nearest_ref_sky_idx = common_functions.find_nearest_ref_sky_idx
+LoadCoordinateMatrix = common_functions.LoadCoordinateMatrix
 
 def ConvertDet2Sky(target_det,origin_sky,origin_det,mtx_conv_det_2_sky):
 
@@ -216,12 +101,32 @@ def ConvertSky2Det(target_sky,origin_sky,origin_det,mtx_conv_sky_2_det):
     return target_det[0,0], target_det[0,1]
 
 
-ref_sky, ref_det, mtx_det_2_sky, mtx_sky_2_det = LoadCoordinateMatrix()
+ref_sky = []
+ref_det = []
+mtx_det_2_sky = []
+mtx_sky_2_det = []
+for idx_ra in range(0,1):
+    for idx_dec in range(0,1):
+        ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID,detector)
+        ref_sky += [ref_sky_local]
+        ref_det += [ref_det_local]
+        mtx_det_2_sky += [mtx_det_2_sky_local]
+        mtx_sky_2_det += [mtx_sky_2_det_local]
+if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
+    ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(97,97,on_sample,on_obsID,detector)
+    ref_sky += [ref_sky_local]
+    ref_det += [ref_det_local]
+    mtx_det_2_sky += [mtx_det_2_sky_local]
+    mtx_sky_2_det += [mtx_sky_2_det_local]
 
 def DistanceToROI(ra,dec):
 
-    evt_detx, evt_dety = ConvertSky2Det([ra,dec],ref_sky,ref_det,mtx_sky_2_det)
-    roi_detx, roi_dety = ConvertSky2Det([roi_ra,roi_dec],ref_sky,ref_det,mtx_sky_2_det)
+    ref_sky_idx = 0
+    if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
+        ref_sky_idx = 1
+
+    evt_detx, evt_dety = ConvertSky2Det([ra,dec],ref_sky[ref_sky_idx],ref_det[ref_sky_idx],mtx_sky_2_det[ref_sky_idx])
+    roi_detx, roi_dety = ConvertSky2Det([roi_ra,roi_dec],ref_sky[ref_sky_idx],ref_det[ref_sky_idx],mtx_sky_2_det[ref_sky_idx])
 
     return pow(pow(evt_detx-roi_detx,2)+pow(evt_dety-roi_dety,2),0.5)*0.05/(60.*60.)
 
@@ -321,8 +226,9 @@ def find_point_sources(image_data,image_mask):
                 image_mask.zaxis[idx_x,idx_y] = 1
 
 
-find_point_sources(image_det_sci,image_det_mask)
-find_point_sources(image_det_sci,image_det_mask)
+if point_source_cut:
+    find_point_sources(image_det_sci,image_det_mask)
+    find_point_sources(image_det_sci,image_det_mask)
 
 
 image_det_sci = MyArray2D()
@@ -516,87 +422,74 @@ axbig.errorbar(detx_sci.xaxis,detx_sci.yaxis,yerr=detx_sci.yerr,color='k',label=
 axbig.plot(detx_qpb.xaxis,detx_qpb.yaxis,color='blue',label='QPB')
 axbig.plot(detx_spf.xaxis,detx_spf.yaxis,color='green',label='SPF')
 axbig.plot(detx_bkg.xaxis,detx_bkg.yaxis,color='red',label='Bkg')
+axbig.set_yscale('log')
+axbig.set_ylim(bottom=1)
 axbig.set_xlabel('DETX')
 axbig.legend(loc='best')
 fig.savefig("%s/%s_%s_detx_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
-#sci_filename = '../output_plots/sci_spectrum_sum.fits'
-#bkg_filename = '../output_plots/bkg_spectrum_sum.fits'
-#
-#sci_hdu_list = fits.open(sci_filename)
-#print (sci_filename)
-#print (sci_hdu_list.info())
-#
-#
-#sci_table = Table.read(sci_filename, hdu=1)
-#bkg_table = Table.read(bkg_filename, hdu=1)
-#print('sci_table.columns:')
-#print(sci_table.columns)
-#
-#energy_threshold = 4000
-#energy_axis = []
-#res_count_axis = []
-#res_count_error = []
-#for entry in range(0,len(sci_table)):
-#    sci_entry_energy = sci_table[entry]['Energy']
-#    sci_entry_count = sci_table[entry]['Count']
-#    bkg_entry_count = bkg_table[entry]['Count']
-#    if sci_entry_energy<energy_threshold: continue
-#    energy_axis += [sci_entry_energy]
-#    res_count_axis += [sci_entry_count-bkg_entry_count]
-#    res_count_error += [max(1.,pow(sci_entry_count,0.5))]
-#    print('sci_entry_energy = %s'%(sci_entry_energy))
-#    print('sci_entry_count = %s'%(sci_entry_count))
-#    print('bkg_entry_count = %s'%(bkg_entry_count))
-#energy_axis = np.array(energy_axis)
-#res_count_axis = np.array(res_count_axis)
-#res_count_error = np.array(res_count_error)
-#
-#
-#def continuum_func(x,A,gamma):
-#    #return A*pow(x/1000.,-1.*gamma)
-#    return A*np.exp(x/1000.*(-1.*gamma))
-#
-#def line_emission_func(x,A,E0,sigma):
-#    return A*np.exp(-0.5*pow((x-E0)/sigma,2))
-#
-#def emission_model(x,A_nontherm,gamma_nontherm,A_Fe_K_alpha,E_Fe_K_alpha,sigma):
-#    return continuum_func(x,A_nontherm,gamma_nontherm) + line_emission_func(x,A_Fe_K_alpha,E_Fe_K_alpha,sigma)
-#
-#start = (1e3,2,200,6600,107)
-#limit_upper = (1e6,10,1e6,7000,117)
-#limit_lower = (0,0,0,6000,97)
-#popt, pcov = curve_fit(emission_model,energy_axis,res_count_axis,p0=start,sigma=res_count_error,absolute_sigma=True,bounds=(limit_lower,limit_upper))
-#
-#model_fit = emission_model(energy_axis, *popt)
-#
-#powerlaw_amp = popt[0]
-#powerlaw_idx = popt[1]
-#Fe_K_alpha_amp = popt[2]
-#Fe_K_alpha_E = popt[3]
-#E_sigma = popt[4]
-#print ('powerlaw_amp = %s'%(powerlaw_amp))
-#print ('powerlaw_idx = %s'%(powerlaw_idx))
-#print ('Fe_K_alpha_amp = %s'%(Fe_K_alpha_amp))
-#print ('Fe_K_alpha_E = %s'%(Fe_K_alpha_E))
-#print ('E_sigma = %s'%(E_sigma))
-#
-#fig, ax = plt.subplots()
-#figsize_x = 8.
-#figsize_y = 6.
-#fig.set_figheight(figsize_y)
-#fig.set_figwidth(figsize_x)
-#
-#fig.clf()
-#axbig = fig.add_subplot()
-#axbig.errorbar(energy_axis,res_count_axis,yerr=res_count_error,color='k',label='Data')
-#axbig.plot(energy_axis,model_fit,color='red',label='Model')
-#axbig.set_yscale('log')
-#axbig.set_ylim(bottom=1)
-#axbig.set_xlabel('Energy [eV]')
-#axbig.legend(loc='best')
-#fig.savefig("../output_plots/fit_model.png",bbox_inches='tight')
-#axbig.remove()
+
+
+energy_threshold = 4000
+energy_axis = []
+res_count_axis = []
+res_count_error = []
+for entry in range(0,len(spectrum_sci.xaxis)):
+    sci_entry_energy = spectrum_sci.xaxis[entry]
+    sci_entry_count = spectrum_sci.yaxis[entry]
+    bkg_entry_count = spectrum_bkg.yaxis[entry]
+    if sci_entry_energy<energy_threshold: continue
+    energy_axis += [sci_entry_energy]
+    res_count_axis += [sci_entry_count-bkg_entry_count]
+    res_count_error += [max(1.,pow(sci_entry_count,0.5))]
+energy_axis = np.array(energy_axis)
+res_count_axis = np.array(res_count_axis)
+res_count_error = np.array(res_count_error)
+
+
+def continuum_func(x,A,gamma):
+    return A*np.exp(x/1000.*(-1.*gamma))
+
+def line_emission_func(x,A,E0,sigma):
+    return A*np.exp(-0.5*pow((x-E0)/sigma,2))
+
+def emission_model(x,A_nontherm,gamma_nontherm,A_Fe_K_alpha,E_Fe_K_alpha,sigma):
+    return continuum_func(x,A_nontherm,gamma_nontherm) + line_emission_func(x,A_Fe_K_alpha,E_Fe_K_alpha,sigma)
+
+start = (1e3,2,200,6600,107)
+limit_upper = (1e6,10,1e6,7000,117)
+limit_lower = (0,0,0,6000,97)
+popt, pcov = curve_fit(emission_model,energy_axis,res_count_axis,p0=start,sigma=res_count_error,absolute_sigma=True,bounds=(limit_lower,limit_upper))
+
+model_fit = emission_model(energy_axis, *popt)
+
+powerlaw_amp = popt[0]
+powerlaw_idx = popt[1]
+Fe_K_alpha_amp = popt[2]
+Fe_K_alpha_E = popt[3]
+E_sigma = popt[4]
+print ('powerlaw_amp = %s'%(powerlaw_amp))
+print ('powerlaw_idx = %s'%(powerlaw_idx))
+print ('Fe_K_alpha_amp = %s'%(Fe_K_alpha_amp))
+print ('Fe_K_alpha_E = %s'%(Fe_K_alpha_E))
+print ('E_sigma = %s'%(E_sigma))
+
+fig, ax = plt.subplots()
+figsize_x = 8.
+figsize_y = 6.
+fig.set_figheight(figsize_y)
+fig.set_figwidth(figsize_x)
+
+fig.clf()
+axbig = fig.add_subplot()
+axbig.errorbar(energy_axis,res_count_axis,yerr=res_count_error,color='k',label='Data')
+axbig.plot(energy_axis,model_fit,color='red',label='Model')
+axbig.set_yscale('log')
+axbig.set_ylim(bottom=1)
+axbig.set_xlabel('Energy [eV]')
+axbig.legend(loc='best')
+fig.savefig("../output_plots/fit_model.png",bbox_inches='tight')
+axbig.remove()
 
 print ('I am done.')

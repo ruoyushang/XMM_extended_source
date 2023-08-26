@@ -42,8 +42,8 @@ cp /Users/rshang/xmm_analysis/analysis_code/*.py .
 
 #sh run_rename.sh
 
-sh run_filtering.sh
-python3 read_fits_header.py
+#sh run_filtering.sh
+sh run_skyref.sh
 sh run_esky2det.sh
 #
 #sh run_regions.sh
