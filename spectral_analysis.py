@@ -5,14 +5,15 @@ from astropy import units as my_unit
 from astropy.coordinates import SkyCoord
 from astropy.coordinates import ICRS, Galactic, FK4, FK5  # Low-level frames
 import numpy as np
+from numpy.linalg import inv
 from scipy.optimize import least_squares
 from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 
 import common_functions
 
-#on_sample = 'extragalactic'
-#on_obsID = 'ID0505460501'
+on_sample = 'extragalactic'
+on_obsID = 'ID0505460501'
 #on_obsID = 'ID0690900101'
 #on_obsID = 'ID0803160301'
 #on_obsID = 'ID0820560101'
@@ -22,9 +23,9 @@ import common_functions
 #on_obsID = 'ID0827251001'
 #on_obsID = 'ID0827251101'
 
-on_sample = 'Cas_A'
+#on_sample = 'Cas_A'
 #on_obsID = 'ID0412180101'
-on_obsID = 'ID0400210101' # Cas A Northern lobe
+#on_obsID = 'ID0400210101' # Cas A Northern lobe
 #on_obsID = 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
 
 #on_sample = '3HWC_J1928_p178'
@@ -36,10 +37,17 @@ detector = 'mos2'
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 
-exclusion_bins = 0
+exclusion_inner = 0.
+#exclusion_outer = 0.15
+#exclusion_inner = 0.15
+exclusion_outer = 1e10
+
 energy_cut = 2000
-#ratio_cut = 0.75
-ratio_cut = 1e10
+
+energy_array = [2000,4000,6000,8000,10000,12000]
+
+roi_ra = 350.85
+roi_dec = 58.815
 
 MyArray1D = common_functions.MyArray1D
 MyArray2D = common_functions.MyArray2D
@@ -64,6 +72,159 @@ sky_dec_low = common_functions.sky_dec_low
 sky_dec_high = common_functions.sky_dec_high
 sky_scale = common_functions.sky_scale
 
+def LoadCoordinateMatrix():
+
+    origin_filename = '../%s/%s/analysis/%s_esky2det.txt'%(on_sample,on_obsID,detector)
+    offset1_filename = '../%s/%s/analysis/%s_esky2det_offset1.txt'%(on_sample,on_obsID,detector)
+    offset2_filename = '../%s/%s/analysis/%s_esky2det_offset2.txt'%(on_sample,on_obsID,detector)
+    print ('read file: %s'%(origin_filename))
+    origin_det = [0,0]
+    origin_sky = [0,0]
+    offset1_det = [0,0]
+    offset1_sky = [0,0]
+    offset2_det = [0,0]
+    offset2_sky = [0,0]
+
+    origin_file = open(origin_filename)
+    last_line = False
+    for line in origin_file:
+        if last_line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            origin_det[0] = float(new_text_list[0])
+            origin_det[1] = float(new_text_list[1].strip('\n'))
+            break
+        if 'Source RA' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            origin_sky[0] = float(new_text_list[4])
+        if 'Source dec' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            origin_sky[1] = float(new_text_list[4])
+        if '# detX       detY' in line:
+            last_line = True
+
+    print ('origin_det = %s'%(origin_det))
+    print ('origin_sky = %s'%(origin_sky))
+
+    offset1_file = open(offset1_filename)
+    last_line = False
+    for line in offset1_file:
+        if last_line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset1_det[0] = float(new_text_list[0])
+            offset1_det[1] = float(new_text_list[1].strip('\n'))
+            break
+        if 'Source RA' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset1_sky[0] = float(new_text_list[4])
+        if 'Source dec' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset1_sky[1] = float(new_text_list[4])
+        if '# detX       detY' in line:
+            last_line = True
+
+    print ('offset1_det = %s'%(offset1_det))
+    print ('offset1_sky = %s'%(offset1_sky))
+
+    offset2_file = open(offset2_filename)
+    last_line = False
+    for line in offset2_file:
+        if last_line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset2_det[0] = float(new_text_list[0])
+            offset2_det[1] = float(new_text_list[1].strip('\n'))
+            break
+        if 'Source RA' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset2_sky[0] = float(new_text_list[4])
+        if 'Source dec' in line:
+            text_list = line.split(' ')
+            new_text_list = []
+            for entry in text_list:
+                if entry!='':
+                    new_text_list += [entry]
+            offset2_sky[1] = float(new_text_list[4])
+        if '# detX       detY' in line:
+            last_line = True
+
+    print ('offset2_det = %s'%(offset2_det))
+    print ('offset2_sky = %s'%(offset2_sky))
+
+    mtx_delta_sky = np.matrix([ [offset1_sky[0]-origin_sky[0], offset1_sky[1]-origin_sky[1]] , [offset2_sky[0]-origin_sky[0], offset2_sky[1]-origin_sky[1]] ])
+    mtx_delta_det = np.matrix([ [offset1_det[0]-origin_det[0], offset1_det[1]-origin_det[1]] , [offset2_det[0]-origin_det[0], offset2_det[1]-origin_det[1]] ])
+
+    inv_mtx_delta_sky = inv(mtx_delta_sky)
+    mtx_conv_sky_2_det = np.matmul(mtx_delta_det,inv_mtx_delta_sky)
+    inv_mtx_delta_det = inv(mtx_delta_det)
+    mtx_conv_det_2_sky = np.matmul(mtx_delta_sky,inv_mtx_delta_det)
+
+    return origin_sky, origin_det, mtx_conv_det_2_sky, mtx_conv_sky_2_det
+
+def ConvertDet2Sky(target_det,origin_sky,origin_det,mtx_conv_det_2_sky):
+
+    target_det = np.array(target_det)
+    origin_sky = np.array(origin_sky)
+    origin_det = np.array(origin_det)
+
+    delta_det = target_det-origin_det
+    delta_sky = np.matmul(mtx_conv_det_2_sky,delta_det)
+    target_sky = delta_sky+origin_sky
+
+    return target_sky[0,0], target_sky[0,1]
+
+def ConvertSky2Det(target_sky,origin_sky,origin_det,mtx_conv_sky_2_det):
+
+    target_sky = np.array(target_sky)
+    origin_sky = np.array(origin_sky)
+    origin_det = np.array(origin_det)
+
+    delta_sky = target_sky-origin_sky
+    delta_det = np.matmul(mtx_conv_sky_2_det,delta_sky)
+    target_det = delta_det+origin_det
+
+    return target_det[0,0], target_det[0,1]
+
+
+ref_sky, ref_det, mtx_det_2_sky, mtx_sky_2_det = LoadCoordinateMatrix()
+
+def DistanceToROI(ra,dec):
+
+    evt_detx, evt_dety = ConvertSky2Det([ra,dec],ref_sky,ref_det,mtx_sky_2_det)
+    roi_detx, roi_dety = ConvertSky2Det([roi_ra,roi_dec],ref_sky,ref_det,mtx_sky_2_det)
+
+    return pow(pow(evt_detx-roi_detx,2)+pow(evt_dety-roi_dety,2),0.5)*0.05/(60.*60.)
+
 def ConvertGalacticToRaDec(l, b):
     my_sky = SkyCoord(l*my_unit.deg, b*my_unit.deg, frame='galactic')
     return my_sky.icrs.ra.deg, my_sky.icrs.dec.deg
@@ -72,15 +233,27 @@ def ConvertRaDecToGalactic(ra, dec):
     my_sky = SkyCoord(ra*my_unit.deg, dec*my_unit.deg, frame='icrs')
     return my_sky.galactic.l.deg, my_sky.galactic.b.deg
 
+def ConvertRaDecMapToGalacticMap(radec_map, galactic_map):
+
+    for idx_x in range(0,len(radec_map.xaxis)):
+        for idx_y in range(0,len(radec_map.yaxis)):
+            pix_ra = radec_map.xaxis[idx_x]
+            pix_dec = radec_map.yaxis[idx_y]
+            pix_content = radec_map.zaxis[idx_x,idx_y]
+            pix_l, pix_b = ConvertRaDecToGalactic(pix_ra,pix_dec)
+            galactic_map.fill(pix_l,pix_b,weight=pix_content)
+
+
+
 sky_ra_center = 0.
 sky_dec_center = 0.
 
 input_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
 output_dir = '/Users/rshang/xmm_analysis/output_plots/'
 
-image_det_mask = MyArray2D(pixel_scale=1000)
-image_det_sci = MyArray2D(pixel_scale=1000)
-image_det_bkg = MyArray2D(pixel_scale=1000)
+image_det_mask = MyArray2D(pixel_scale=500)
+image_det_sci = MyArray2D(pixel_scale=500)
+image_det_bkg = MyArray2D(pixel_scale=500)
 for ccd in range(0,len(ana_ccd_bins)):
 
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
@@ -90,7 +263,6 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_pi = sci_table[entry]['PI']
         evt_detx = sci_table[entry]['DETX']
         evt_dety = sci_table[entry]['DETY']
-        if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
         if evt_pi<energy_cut: continue
         image_det_sci.fill(evt_detx,evt_dety)
 
@@ -105,7 +277,6 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_pi = bkg_table[entry]['PI']
         evt_detx = bkg_table[entry]['DETX']
         evt_dety = bkg_table[entry]['DETY']
-        if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
         if evt_pi<energy_cut: continue
         image_det_bkg.fill(evt_detx,evt_dety,weight=0.1)
 
@@ -118,13 +289,40 @@ sky_l_high = sky_l_center+0.28
 sky_b_low = sky_b_center-0.28
 sky_b_high = sky_b_center+0.28
 
-image_det_mask.calc_ratio(image_det_sci,image_det_bkg)
-ratio_dist = MyArray1D(bin_start=-1.,bin_end=3.,pixel_scale=0.1)
-for idx_x in range(0,len(image_det_mask.xaxis)):
-    for idx_y in range(0,len(image_det_mask.yaxis)):
-        content = image_det_mask.zaxis[idx_x,idx_y]
-        if content==0.: continue
-        ratio_dist.fill(content)
+
+def find_point_sources(image_data,image_mask):
+
+    avg_cnt = 0.
+    pix_used = 0.
+    for idx_x in range(0,len(image_mask.xaxis)):
+        for idx_y in range(0,len(image_mask.yaxis)):
+            mask = image_mask.zaxis[idx_x,idx_y]
+            if mask==1: continue
+            avg_cnt += image_data.zaxis[idx_x,idx_y]
+            pix_used += 1.
+    avg_cnt = avg_cnt/pix_used
+
+    rms_cnt = 0.
+    pix_used = 0.
+    for idx_x in range(0,len(image_mask.xaxis)):
+        for idx_y in range(0,len(image_mask.yaxis)):
+            mask = image_mask.zaxis[idx_x,idx_y]
+            if mask==1: continue
+            rms_cnt += pow(image_data.zaxis[idx_x,idx_y]-avg_cnt,2)
+            pix_used += 1.
+    rms_cnt = pow(rms_cnt/pix_used,0.5)
+
+    for idx_x in range(0,len(image_mask.xaxis)):
+        for idx_y in range(0,len(image_mask.yaxis)):
+            mask = image_mask.zaxis[idx_x,idx_y]
+            if mask==1: continue
+            significance = (image_data.zaxis[idx_x,idx_y]-avg_cnt)/rms_cnt
+            if significance>3.:
+                image_mask.zaxis[idx_x,idx_y] = 1
+
+
+find_point_sources(image_det_sci,image_det_mask)
+find_point_sources(image_det_sci,image_det_mask)
 
 
 image_det_sci = MyArray2D()
@@ -150,14 +348,13 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_dety = sci_table[entry]['DETY']
         evt_ra = sci_table[entry]['RA']
         evt_dec = sci_table[entry]['DEC']
-        evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
-        if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
+        distance_2_roi = DistanceToROI(evt_ra,evt_dec)
+        if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
         if evt_pi<energy_cut: continue
-        zscore = image_det_mask.get_bin_content(evt_detx,evt_dety)
-        if zscore>ratio_cut: continue
+        mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        if mask==1: continue
         image_det_sci.fill(evt_detx,evt_dety)
         image_icrs_sci.fill(evt_ra,evt_dec)
-        image_galactic_sci.fill(evt_l,evt_b)
         spectrum_sci.fill(evt_pi)
         detx_sci.fill(evt_detx)
 
@@ -170,10 +367,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_dety = bkg_table[entry]['DETY']
         evt_ra = bkg_table[entry]['RA']
         evt_dec = bkg_table[entry]['DEC']
-        if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
+        distance_2_roi = DistanceToROI(evt_ra,evt_dec)
+        if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
         if evt_pi<energy_cut: continue
-        zscore = image_det_mask.get_bin_content(evt_detx,evt_dety)
-        if zscore>ratio_cut: continue
+        mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        if mask==1: continue
         image_det_bkg.fill(evt_detx,evt_dety,weight=0.1)
         spectrum_bkg.fill(evt_pi,weight=0.1)
         detx_bkg.fill(evt_detx,weight=0.1)
@@ -187,10 +385,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_dety = qpb_table[entry]['DETY']
         evt_ra = qpb_table[entry]['RA']
         evt_dec = qpb_table[entry]['DEC']
-        if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
+        distance_2_roi = DistanceToROI(evt_ra,evt_dec)
+        if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
         if evt_pi<energy_cut: continue
-        zscore = image_det_mask.get_bin_content(evt_detx,evt_dety)
-        if zscore>ratio_cut: continue
+        mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        if mask==1: continue
         spectrum_qpb.fill(evt_pi,weight=0.1)
         detx_qpb.fill(evt_detx,weight=0.1)
 
@@ -203,12 +402,21 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_dety = spf_table[entry]['DETY']
         evt_ra = spf_table[entry]['RA']
         evt_dec = spf_table[entry]['DEC']
-        if abs(evt_detx)<exclusion_bins and abs(evt_dety)<exclusion_bins: continue
+        distance_2_roi = DistanceToROI(evt_ra,evt_dec)
+        if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
         if evt_pi<energy_cut: continue
-        zscore = image_det_mask.get_bin_content(evt_detx,evt_dety)
-        if zscore>ratio_cut: continue
+        mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        if mask==1: continue
         spectrum_spf.fill(evt_pi,weight=0.1)
         detx_spf.fill(evt_detx,weight=0.1)
+
+sci_bkg_ratio = []
+for ch in range(0,len(energy_array)-1):
+    sci_cnt = spectrum_sci.integral(integral_range=[energy_array[ch],energy_array[ch+1]])
+    bkg_cnt = spectrum_bkg.integral(integral_range=[energy_array[ch],energy_array[ch+1]])
+    if bkg_cnt>0.:
+        sci_bkg_ratio += [sci_cnt/bkg_cnt]
+print ('sci_bkg_ratio = %s'%(sci_bkg_ratio))
 
 fig, ax = plt.subplots()
 figsize_x = 8.
@@ -260,6 +468,7 @@ axbig.imshow(image_icrs_sci.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmi
 fig.savefig("%s/%s_%s_image_icrs_sci.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
+ConvertRaDecMapToGalacticMap(image_icrs_sci,image_galactic_sci)
 fig.clf()
 axbig = fig.add_subplot()
 label_x = 'Gal. l'
@@ -310,14 +519,6 @@ axbig.plot(detx_bkg.xaxis,detx_bkg.yaxis,color='red',label='Bkg')
 axbig.set_xlabel('DETX')
 axbig.legend(loc='best')
 fig.savefig("%s/%s_%s_detx_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
-axbig.remove()
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.plot(ratio_dist.xaxis,ratio_dist.yaxis)
-axbig.set_yscale('log')
-axbig.set_xlabel('Ratio')
-fig.savefig("%s/%s_%s_ratio_dist.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
 #sci_filename = '../output_plots/sci_spectrum_sum.fits'

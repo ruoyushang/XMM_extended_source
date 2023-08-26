@@ -10,7 +10,7 @@ ch_high = 12000
 ch_scale = 100
 t_low = 0
 t_high = 1
-t_scale = 0.05
+t_scale = 0.02
 detx_low = -20000
 detx_high = 20000
 detx_scale = 500
@@ -56,15 +56,16 @@ class MyArray2D:
                 self.zaxis[idx_x,idx_y] = self.zaxis[idx_x,idx_y]+add_array.zaxis[idx_x,idx_y]*factor
                 self.zerr[idx_x,idx_y] = pow(pow(self.zerr[idx_x,idx_y],2)+pow(add_array.zerr[idx_x,idx_y]*factor,2),0.5)
     def fill(self, value_x, value_y, weight=1.):
-        key_idx_x = 0
-        key_idx_y = 0
+        key_idx_x = -1
+        key_idx_y = -1
         for idx_x in range(0,len(self.xaxis)-1):
             if self.xaxis[idx_x]<=value_x and self.xaxis[idx_x+1]>value_x:
                 key_idx_x = idx_x
         for idx_y in range(0,len(self.yaxis)-1):
             if self.yaxis[idx_y]<=value_y and self.yaxis[idx_y+1]>value_y:
                 key_idx_y = idx_y
-        self.zaxis[key_idx_x,key_idx_y] += 1.*weight
+        if key_idx_x>=0 and key_idx_y>=0:
+            self.zaxis[key_idx_x,key_idx_y] += 1.*weight
     def get_bin_content(self, value_x, value_y):
         key_idx_x = 0
         key_idx_y = 0
