@@ -24,8 +24,8 @@ import common_functions
 #on_obsID = 'ID0827251101'
 
 on_sample = 'Cas_A'
-on_obsID = 'ID0412180101'
-#on_obsID = 'ID0400210101' # Cas A Northern lobe
+#on_obsID = 'ID0412180101'
+on_obsID = 'ID0400210101' # Cas A Northern lobe
 #on_obsID = 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
 
 #on_sample = '3HWC_J1928_p178'
@@ -39,10 +39,13 @@ ana_ccd_bins = [0]
 
 #exclusion_inner = 0.
 #exclusion_outer = 0.15
-exclusion_inner = 0.15
-exclusion_outer = 1e10
+exclusion_inner = 0.10
+exclusion_outer = 0.15
+#exclusion_inner = 0.15
+#exclusion_outer = 1e10
 
-point_source_cut = False
+point_source_cut = True
+#point_source_cut = False
 
 energy_cut = 2000
 

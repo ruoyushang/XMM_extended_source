@@ -60,8 +60,8 @@ on_obsID = sys.argv[2]
 
 diagnostic_plots = True
 #diagnostic_plots = False
-fast_test = True
-#fast_test = False
+#fast_test = True
+fast_test = False
 
 #detector = 'mos1'
 #detector = 'mos2'
@@ -426,6 +426,7 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
         data_qpb_ratio += [data/qpb]
 
     sp_scale_list = []
+    max_sp_scale_list = []
     xray_scale_list = []
     for ch in range(1,len(energy_range)):
         xray_scale_list += [xray_qpb_ratio[ch-1]]
@@ -435,6 +436,8 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
         raw_spf_cnt = spf_pattern[ch].integral()
         sp_scale = max((data_cnt-qpb_cnt-xray_cnt)/raw_spf_cnt,0.)
         sp_scale_list += [sp_scale]
+        max_sp_scale = max((data_cnt-qpb_cnt)/raw_spf_cnt,0.)
+        max_sp_scale_list += [max_sp_scale]
 
     min_data_qpb_diff = 1e10
     min_data_qpb_diff_ch = 0
@@ -505,8 +508,8 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
                 spf_model_sum += spf_model
                 xray_model_sum += xray_model
                 if data_cnt==0: continue
-                #pattern_weight = 1./pow(data_cnt,0.5)
-                pattern_weight = 1./data_cnt
+                pattern_weight = 1./pow(data_cnt,0.5)
+                #pattern_weight = 1./data_cnt
                 chi = (data_cnt - xray_model - spf_model - qpb_model)*pattern_weight
                 chi_sum += chi
 
@@ -524,11 +527,21 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
 
         return chi2
 
+    max_sp_scale = 0.
+    for ch in range(1,len(energy_range)):
+        max_sp_scale += max_sp_scale_list[ch-1]
+    max_sp_scale = max_sp_scale/float(len(energy_range)-1)
+    if sp_scale_list[min_data_qpb_diff_ch-1]>0.:
+        max_sp_scale = max_sp_scale/sp_scale_list[min_data_qpb_diff_ch-1]
+    else:
+        max_sp_scale = 1.
+
     print ('min_data_qpb_diff_ch = %s'%(min_data_qpb_diff_ch))
     print ('sp_scale_list[min_data_qpb_diff_ch-1] = %s'%(sp_scale_list[min_data_qpb_diff_ch-1]))
+    print ('max_sp_scale = %s'%(max_sp_scale))
     qpb_scale = 1.
-    param_init = [1.]
-    param_bound_upper = [3.]
+    param_init = [min(1.,max_sp_scale)]
+    param_bound_upper = [max_sp_scale]
     param_bound_lower = [0.]
     #param_init = [1.0,0.1,-1.]
     #param_bound_upper = [3.,3.,0.1]
@@ -553,7 +566,6 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     for ch in range(1,len(energy_range)):
         print ('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
         sp_scale_norm = result.x[0]*sp_scale_list[min_data_qpb_diff_ch-1]
-        #sp_scale_norm += result.x[1]*sp_scale_list[min_data_qpb_diff_ch-1]*pow(energy_range[ch]/1000.,(-1.*result.x[2]))
         print ('ch = %s'%(ch))
         print ('sp_scale_list[ch-1] = %s'%(sp_scale_list[ch-1]))
         print ('sp_scale_fit = %s'%(sp_scale_norm))
@@ -561,9 +573,6 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
         data_qpb_diff = abs(data_qpb_ratio[ch-1]-1.)
         print ('spfree_data_qpb_diff = %s'%(spfree_data_qpb_diff))
         print ('data_qpb_diff = %s'%(data_qpb_diff))
-        #if spfree_data_qpb_diff<1.0 and data_qpb_diff>1.0:
-        #    print ('use initial estimate')
-        #    sp_scale_norm = sp_scale_list[ch-1] 
         data_cnt_sum = 0.
         qpb_model_sum = 0.
         spf_model_sum = 0.
