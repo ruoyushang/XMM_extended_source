@@ -74,13 +74,12 @@ on_filter = sys.argv[4]
 #on_filter = 'reg3'
 #on_filter = 'reg4'
 
-#energy_array = [200,1000,2000,3000,5000,8000,12000]
 energy_array = [2000,4000,6000,8000,10000,12000]
-#energy_array = [2000,12000]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 #ana_ccd_bins = [1]
 ana_ccd_bins = [0]
 
+#qpb_calibration = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 qpb_calibration = [1.0, 1.316644016880023, 1.165767178219302, 1.1071213894776806, 1.076673512002368, 1.0718047208971304]
 
 output_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
@@ -103,6 +102,36 @@ src_dety = 0
 if 'ID0400210101' in on_obsID:
     src_detx = 13000
     src_dety = 13000
+
+def find_point_sources(image_data,image_mask):
+
+    avg_cnt = 0.
+    pix_used = 0.
+    for idx_x in range(0,len(image_mask.xaxis)):
+        for idx_y in range(0,len(image_mask.yaxis)):
+            mask = image_mask.zaxis[idx_x,idx_y]
+            if mask==1: continue
+            avg_cnt += image_data.zaxis[idx_x,idx_y]
+            pix_used += 1.
+    avg_cnt = avg_cnt/pix_used
+
+    rms_cnt = 0.
+    pix_used = 0.
+    for idx_x in range(0,len(image_mask.xaxis)):
+        for idx_y in range(0,len(image_mask.yaxis)):
+            mask = image_mask.zaxis[idx_x,idx_y]
+            if mask==1: continue
+            rms_cnt += pow(image_data.zaxis[idx_x,idx_y]-avg_cnt,2)
+            pix_used += 1.
+    rms_cnt = pow(rms_cnt/pix_used,0.5)
+
+    for idx_x in range(0,len(image_mask.xaxis)):
+        for idx_y in range(0,len(image_mask.yaxis)):
+            mask = image_mask.zaxis[idx_x,idx_y]
+            if mask==1: continue
+            significance = (image_data.zaxis[idx_x,idx_y]-avg_cnt)/rms_cnt
+            if significance>5.:
+                image_mask.zaxis[idx_x,idx_y] = 1
 
 def ConvertGalacticToRaDec(l, b):
     my_sky = SkyCoord(l*u.deg, b*u.deg, frame='galactic')
@@ -1159,7 +1188,6 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_spectrum_sci_fov = output_sci_fov[4]
     on_detx_sci_fov = output_sci_fov[5]
     on_image_sci_fov = output_sci_fov[6]
-    #on_image_sky_sci_fov = output_sci_fov[7]
     
     on_duration_sci_cor = output_sci_cor[0]
     on_evt_count_sci_cor = output_sci_cor[1]
@@ -1179,7 +1207,6 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_spectrum_fwc_fov = output_fwc_fov[4]
     on_detx_fwc_fov = output_fwc_fov[5]
     on_image_fwc_fov = output_fwc_fov[6]
-    #on_image_sky_fwc_fov = output_fwc_fov[7]
     
     on_duration_fwc_cor = output_fwc_cor[0]
     on_evt_count_fwc_cor = output_fwc_cor[1]
@@ -1188,7 +1215,34 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_spectrum_fwc_cor = output_fwc_cor[4]
     on_detx_fwc_cor = output_fwc_cor[5]
     on_image_fwc_cor = output_fwc_cor[6]
+
+    ### Remove strong X-ray hot spots ###
+    image_det_mask = MyArray2D()
+    find_point_sources(on_image_sci_fov[0],image_det_mask)
+    find_point_sources(on_image_sci_fov[0],image_det_mask)
+
+    output_sci_fov_mask = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=image_det_mask,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_fov_mask = read_event_file(on_fwc_fov_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=image_det_mask,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+
+    on_duration_sci_fov_mask = output_sci_fov_mask[0]
+    on_evt_count_sci_fov_mask = output_sci_fov_mask[1]
+    on_lightcurve_sci_fov_mask = output_sci_fov_mask[2]
+    on_pattern_sci_fov_mask = output_sci_fov_mask[3]
+    on_spectrum_sci_fov_mask = output_sci_fov_mask[4]
+    on_detx_sci_fov_mask = output_sci_fov_mask[5]
+    on_image_sci_fov_mask = output_sci_fov_mask[6]
     
+    on_duration_fwc_fov_mask = output_fwc_fov_mask[0]
+    on_evt_count_fwc_fov_mask = output_fwc_fov_mask[1]
+    on_lightcurve_fwc_fov_mask = output_fwc_fov_mask[2]
+    on_pattern_fwc_fov_mask = output_fwc_fov_mask[3]
+    on_spectrum_fwc_fov_mask = output_fwc_fov_mask[4]
+    on_detx_fwc_fov_mask = output_fwc_fov_mask[5]
+    on_image_fwc_fov_mask = output_fwc_fov_mask[6]
+    ### Remove strong X-ray hot spots ###
+    
+
+    area_pix_frac_fwc_fov_mask = on_image_fwc_fov_mask[0].integral()
     area_pix_frac_fwc_fov = on_image_fwc_fov[0].integral()
     area_pix_frac_fwc_cor = on_image_fwc_cor[0].integral()
     
@@ -1211,9 +1265,6 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     
     for ch in range(0,len(energy_range)):
 
-        #fwc_2_sci_ratio = on_image_sci_cor[ch].integral()/on_image_fwc_cor[ch].integral()
-        #print ('After timecut, ch = %s, ON data fwc_2_sci_ratio = %s'%(ch,fwc_2_sci_ratio))
-
         on_spectrum_sci_cor[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
         on_spectrum_fwc_fov[ch].scale(fwc_2_sci_ratio)
         on_spectrum_fwc_cor[ch].scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
@@ -1222,6 +1273,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         on_pattern_fwc_cor[ch].scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
         on_detx_fwc_fov[ch].scale(fwc_2_sci_ratio)
         on_image_fwc_fov[ch].scale(fwc_2_sci_ratio)
+
+        on_pattern_sci_fov_mask[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_fov_mask)
 
     if diagnostic_plots:
 
@@ -1326,7 +1379,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     for ch in range(0,len(energy_range)):
         xray_pattern_fov_template[ch].add(qpb_pattern_fov_template[ch])
 
-    xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
+    xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov_mask,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
         
     sp_detx_fov_template = []
     sp_image_fov_template = []
