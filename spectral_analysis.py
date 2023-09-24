@@ -12,9 +12,9 @@ import matplotlib.pyplot as plt
 
 import common_functions
 
-#on_sample = 'extragalactic'
+on_sample = 'extragalactic'
 #on_obsID = 'ID0505460501'
-#on_obsID = 'ID0690900101'
+on_obsID = 'ID0690900101'
 #on_obsID = 'ID0803160301'
 #on_obsID = 'ID0820560101'
 #on_obsID = 'ID0827200401'
@@ -22,14 +22,20 @@ import common_functions
 #on_obsID = 'ID0827241101'
 #on_obsID = 'ID0827251001'
 #on_obsID = 'ID0827251101'
+#on_obsID = 'ID0804860301'
 
-on_sample = 'Cas_A'
-on_obsID = 'ID0412180101'
+#on_sample = 'Cas_A'
+#on_obsID = 'ID0412180101'
 #on_obsID = 'ID0400210101' # Cas A Northern lobe
 #on_obsID = 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
 
 #on_sample = '3HWC_J1928_p178'
 #on_obsID = 'ID0902120101'
+#on_obsID = 'ID0503740101'
+#on_obsID = 'ID0830192001'
+#on_obsID = 'ID0841190101'
+#on_obsID = 'ID0861880101'
+#on_obsID = 'ID0406730101'
 
 #detector = 'mos1'
 detector = 'mos2'
@@ -43,16 +49,22 @@ exclusion_inner = 0.
 #exclusion_outer = 0.15
 exclusion_outer = 1e10
 
-#point_source_cut = True
-point_source_cut = False
+point_source_cut = True
+#point_source_cut = False
 
-energy_cut = 2000
+do_fit = False
+
+energy_cut_lower = 2000
+energy_cut_upper = 12000
 
 energy_array = [2000,4000,6000,8000,10000,12000]
 
 roi_ra = 350.85
 roi_dec = 58.815
 
+sample_scale = 10.
+
+map_rebin = 3
 MyArray1D = common_functions.MyArray1D
 MyArray2D = common_functions.MyArray2D
 pattern_low = common_functions.pattern_low
@@ -66,10 +78,13 @@ t_high = common_functions.t_high
 t_scale = common_functions.t_scale
 detx_low = common_functions.detx_low
 detx_high = common_functions.detx_high
-detx_scale = common_functions.detx_scale
+detx_scale = map_rebin*common_functions.detx_scale
+dety_low = common_functions.dety_low
+dety_high = common_functions.dety_high
+dety_scale = map_rebin*common_functions.dety_scale
 detr_low = common_functions.detr_low
 detr_high = common_functions.detr_high
-detr_scale = common_functions.detr_scale
+detr_scale = map_rebin*common_functions.detr_scale
 sky_ra_low = common_functions.sky_ra_low
 sky_ra_high = common_functions.sky_ra_high
 sky_dec_low = common_functions.sky_dec_low
@@ -150,6 +165,35 @@ def ConvertRaDecMapToGalacticMap(radec_map, galactic_map):
             pix_l, pix_b = ConvertRaDecToGalactic(pix_ra,pix_dec)
             galactic_map.fill(pix_l,pix_b,weight=pix_content)
 
+def MakeMapProjection(image_map, profile_x, profile_y):
+
+    delta_pix_z = profile_x.xaxis[1]-profile_x.xaxis[0]
+    for idx_z in range(0,len(profile_x.xaxis)):
+        pix_z_lo = profile_x.xaxis[idx_z]
+        pix_z_hi = profile_x.xaxis[idx_z]+delta_pix_z
+        profile_x.yaxis[idx_z] = 0.
+        for idx_x in range(0,len(image_map.xaxis)):
+            pix_x = image_map.xaxis[idx_x]
+            if pix_x<pix_z_lo: continue
+            if pix_x>=pix_z_hi: continue
+            for idx_y in range(0,len(image_map.yaxis)):
+                pix_y = image_map.yaxis[idx_y]
+                pix_content = image_map.zaxis[idx_x,idx_y]
+                profile_x.yaxis[idx_z] += pix_content
+
+    delta_pix_z = profile_y.xaxis[1]-profile_y.xaxis[0]
+    for idx_z in range(0,len(profile_y.xaxis)):
+        pix_z_lo = profile_y.xaxis[idx_z]
+        pix_z_hi = profile_y.xaxis[idx_z]+delta_pix_z
+        profile_y.yaxis[idx_z] = 0.
+        for idx_y in range(0,len(image_map.yaxis)):
+            pix_y = image_map.yaxis[idx_y]
+            if pix_y<pix_z_lo: continue
+            if pix_y>=pix_z_hi: continue
+            for idx_x in range(0,len(image_map.xaxis)):
+                pix_x = image_map.xaxis[idx_x]
+                pix_content = image_map.zaxis[idx_x,idx_y]
+                profile_y.yaxis[idx_z] += pix_content
 
 
 sky_ra_center = 0.
@@ -158,9 +202,9 @@ sky_dec_center = 0.
 input_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
 output_dir = '/Users/rshang/xmm_analysis/output_plots/'
 
-image_det_mask = MyArray2D(pixel_scale=500)
-image_det_sci = MyArray2D(pixel_scale=500)
-image_det_bkg = MyArray2D(pixel_scale=500)
+image_det_mask = MyArray2D(pixel_scale=detx_scale)
+image_det_sci = MyArray2D(pixel_scale=detx_scale)
+image_det_bkg = MyArray2D(pixel_scale=detx_scale)
 for ccd in range(0,len(ana_ccd_bins)):
 
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
@@ -170,22 +214,34 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_pi = sci_table[entry]['PI']
         evt_detx = sci_table[entry]['DETX']
         evt_dety = sci_table[entry]['DETY']
-        if evt_pi<energy_cut: continue
+        if evt_pi<energy_cut_lower: continue
+        if evt_pi>energy_cut_upper: continue
         image_det_sci.fill(evt_detx,evt_dety)
 
     sky_ra_center = sci_hdu_list[1].header['REF_RA']
     sky_dec_center = sci_hdu_list[1].header['REF_DEC']
     sky_l_center, sky_b_center = ConvertRaDecToGalactic(sky_ra_center, sky_dec_center)
 
-    bkg_filename = '%s/bkg_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
+    bkg_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     bkg_hdu_list = fits.open(bkg_filename)
     bkg_table = Table.read(bkg_filename, hdu=1)
     for entry in range(0,len(bkg_table)):
         evt_pi = bkg_table[entry]['PI']
         evt_detx = bkg_table[entry]['DETX']
         evt_dety = bkg_table[entry]['DETY']
-        if evt_pi<energy_cut: continue
-        image_det_bkg.fill(evt_detx,evt_dety,weight=0.1)
+        if evt_pi<energy_cut_lower: continue
+        if evt_pi>energy_cut_upper: continue
+        image_det_bkg.fill(evt_detx,evt_dety,weight=1./sample_scale)
+    bkg_filename = '%s/spf_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
+    bkg_hdu_list = fits.open(bkg_filename)
+    bkg_table = Table.read(bkg_filename, hdu=1)
+    for entry in range(0,len(bkg_table)):
+        evt_pi = bkg_table[entry]['PI']
+        evt_detx = bkg_table[entry]['DETX']
+        evt_dety = bkg_table[entry]['DETY']
+        if evt_pi<energy_cut_lower: continue
+        if evt_pi>energy_cut_upper: continue
+        image_det_bkg.fill(evt_detx,evt_dety,weight=1./sample_scale)
 
 sky_ra_low = sky_ra_center-0.28
 sky_ra_high = sky_ra_center+0.28
@@ -196,8 +252,43 @@ sky_l_high = sky_l_center+0.28
 sky_b_low = sky_b_center-0.28
 sky_b_high = sky_b_center+0.28
 
+def smooth_map(image_data):
+
+    print ('smoothing map...')
+    kernel_radius = 4*detx_scale
+    kernel_pix_size = int(kernel_radius/detx_scale)
+    gaus_norm = 2.*np.pi*kernel_radius*kernel_radius
+    image_kernel = MyArray2D(pixel_scale=detx_scale)
+    central_bin_x = int(len(image_kernel.xaxis)/2)
+    central_bin_y = int(len(image_kernel.yaxis)/2)
+    for idx_x in range(0,len(image_kernel.xaxis)):
+        for idx_y in range(0,len(image_kernel.yaxis)):
+            pix_x = image_kernel.xaxis[idx_x]
+            pix_y = image_kernel.yaxis[idx_y]
+            distance = pow(pix_x*pix_x+pix_y*pix_y,0.5)
+            pix_content = np.exp(-(distance*distance)/(2.*kernel_radius*kernel_radius))
+            image_kernel.zaxis[idx_x,idx_y] = pix_content/gaus_norm
+
+    image_smooth = MyArray2D(pixel_scale=detx_scale)
+    for idx_x1 in range(0,len(image_data.xaxis)):
+        print (f'smoothing pix x = {idx_x1}')
+        for idx_y1 in range(0,len(image_data.yaxis)):
+            old_content = image_data.zaxis[idx_x1,idx_y1]
+            for idx_x2 in range(idx_x1-2*kernel_pix_size,idx_x1+2*kernel_pix_size):
+                for idx_y2 in range(idx_y1-2*kernel_pix_size,idx_y1+2*kernel_pix_size):
+                    if idx_x2<0: continue
+                    if idx_y2<0: continue
+                    if idx_x2>=len(image_data.xaxis): continue
+                    if idx_y2>=len(image_data.yaxis): continue
+                    scale = image_kernel.zaxis[central_bin_x+idx_x2-idx_x1,central_bin_y+idx_y2-idx_y1] 
+                    image_smooth.zaxis[idx_x1,idx_y1] += old_content*scale
+
+    print ('done smoothing map.')
+    return image_smooth
 
 def find_point_sources(image_data,image_mask):
+
+    point_source_threshold = 3.
 
     avg_cnt = 0.
     pix_used = 0.
@@ -224,19 +315,21 @@ def find_point_sources(image_data,image_mask):
             mask = image_mask.zaxis[idx_x,idx_y]
             if mask==1: continue
             significance = (image_data.zaxis[idx_x,idx_y]-avg_cnt)/rms_cnt
-            if significance>3.:
+            if significance>point_source_threshold:
                 image_mask.zaxis[idx_x,idx_y] = 1
 
 
+
 if point_source_cut:
-    find_point_sources(image_det_sci,image_det_mask)
-    find_point_sources(image_det_sci,image_det_mask)
+    image_det_sci_smooth = smooth_map(image_det_sci)
+    find_point_sources(image_det_sci_smooth,image_det_mask)
+    find_point_sources(image_det_sci_smooth,image_det_mask)
 
 
 image_det_sci = MyArray2D()
 image_det_bkg = MyArray2D()
-image_icrs_sci = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=0.56,pixel_scale=500.*0.05/(60.*60.))
-image_galactic_sci = MyArray2D(start_x=sky_l_low,start_y=sky_b_low,image_size=0.56,pixel_scale=500.*0.05/(60.*60.))
+image_icrs_sci = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=0.56,pixel_scale=detx_scale*0.05/(60.*60.))
+image_galactic_sci = MyArray2D(start_x=sky_l_low,start_y=sky_b_low,image_size=0.56,pixel_scale=detx_scale*0.05/(60.*60.))
 spectrum_sci = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 spectrum_bkg = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 spectrum_qpb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
@@ -245,6 +338,12 @@ detx_sci = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale
 detx_bkg = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
 detx_qpb = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
 detx_spf = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)
+dety_sci = MyArray1D(bin_start=dety_low,bin_end=dety_high,pixel_scale=dety_scale)
+dety_bkg = MyArray1D(bin_start=dety_low,bin_end=dety_high,pixel_scale=dety_scale)
+dety_qpb = MyArray1D(bin_start=dety_low,bin_end=dety_high,pixel_scale=dety_scale)
+dety_spf = MyArray1D(bin_start=dety_low,bin_end=dety_high,pixel_scale=dety_scale)
+galx_sci = MyArray1D(bin_start=sky_l_low,bin_end=sky_l_high,pixel_scale=detx_scale*0.05/(60.*60.))
+galy_sci = MyArray1D(bin_start=sky_b_low,bin_end=sky_b_high,pixel_scale=detx_scale*0.05/(60.*60.))
 for ccd in range(0,len(ana_ccd_bins)):
 
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
@@ -258,31 +357,15 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_dec = sci_table[entry]['DEC']
         distance_2_roi = DistanceToROI(evt_ra,evt_dec)
         if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
-        if evt_pi<energy_cut: continue
+        if evt_pi<energy_cut_lower: continue
+        if evt_pi>energy_cut_upper: continue
         mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
         if mask==1: continue
         image_det_sci.fill(evt_detx,evt_dety)
         image_icrs_sci.fill(evt_ra,evt_dec)
         spectrum_sci.fill(evt_pi)
         detx_sci.fill(evt_detx)
-
-    bkg_filename = '%s/bkg_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
-    bkg_hdu_list = fits.open(bkg_filename)
-    bkg_table = Table.read(bkg_filename, hdu=1)
-    for entry in range(0,len(bkg_table)):
-        evt_pi = bkg_table[entry]['PI']
-        evt_detx = bkg_table[entry]['DETX']
-        evt_dety = bkg_table[entry]['DETY']
-        evt_ra = bkg_table[entry]['RA']
-        evt_dec = bkg_table[entry]['DEC']
-        distance_2_roi = DistanceToROI(evt_ra,evt_dec)
-        if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
-        if evt_pi<energy_cut: continue
-        mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
-        if mask==1: continue
-        image_det_bkg.fill(evt_detx,evt_dety,weight=0.1)
-        spectrum_bkg.fill(evt_pi,weight=0.1)
-        detx_bkg.fill(evt_detx,weight=0.1)
+        dety_sci.fill(evt_dety)
 
     qpb_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     qpb_hdu_list = fits.open(qpb_filename)
@@ -295,11 +378,20 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_dec = qpb_table[entry]['DEC']
         distance_2_roi = DistanceToROI(evt_ra,evt_dec)
         if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
-        if evt_pi<energy_cut: continue
+        if evt_pi<energy_cut_lower: continue
+        if evt_pi>energy_cut_upper: continue
         mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
         if mask==1: continue
-        spectrum_qpb.fill(evt_pi,weight=0.1)
-        detx_qpb.fill(evt_detx,weight=0.1)
+        spectrum_qpb.fill(evt_pi,weight=1./sample_scale)
+        detx_qpb.fill(evt_detx,weight=1./sample_scale)
+        dety_qpb.fill(evt_dety,weight=1./sample_scale)
+
+        image_det_sci.fill(evt_detx,evt_dety,weight=-1./sample_scale)
+        image_icrs_sci.fill(evt_ra,evt_dec,weight=-1./sample_scale)
+        image_det_bkg.fill(evt_detx,evt_dety,weight=1./sample_scale)
+        spectrum_bkg.fill(evt_pi,weight=1./sample_scale)
+        detx_bkg.fill(evt_detx,weight=1./sample_scale)
+        dety_bkg.fill(evt_dety,weight=1./sample_scale)
 
     spf_filename = '%s/spf_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     spf_hdu_list = fits.open(spf_filename)
@@ -312,11 +404,20 @@ for ccd in range(0,len(ana_ccd_bins)):
         evt_dec = spf_table[entry]['DEC']
         distance_2_roi = DistanceToROI(evt_ra,evt_dec)
         if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
-        if evt_pi<energy_cut: continue
+        if evt_pi<energy_cut_lower: continue
+        if evt_pi>energy_cut_upper: continue
         mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
         if mask==1: continue
-        spectrum_spf.fill(evt_pi,weight=0.1)
-        detx_spf.fill(evt_detx,weight=0.1)
+        spectrum_spf.fill(evt_pi,weight=1./sample_scale)
+        detx_spf.fill(evt_detx,weight=1./sample_scale)
+        dety_spf.fill(evt_dety,weight=1./sample_scale)
+
+        image_det_sci.fill(evt_detx,evt_dety,weight=-1./sample_scale)
+        image_icrs_sci.fill(evt_ra,evt_dec,weight=-1./sample_scale)
+        image_det_bkg.fill(evt_detx,evt_dety,weight=1./sample_scale)
+        spectrum_bkg.fill(evt_pi,weight=1./sample_scale)
+        detx_bkg.fill(evt_detx,weight=1./sample_scale)
+        dety_bkg.fill(evt_dety,weight=1./sample_scale)
 
 sci_bkg_ratio = []
 for ch in range(0,len(energy_array)-1):
@@ -431,6 +532,38 @@ axbig.legend(loc='best')
 fig.savefig("%s/%s_%s_detx_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
+fig.clf()
+axbig = fig.add_subplot()
+axbig.errorbar(dety_sci.xaxis,dety_sci.yaxis,yerr=dety_sci.yerr,color='k',label='Data')
+axbig.plot(dety_qpb.xaxis,dety_qpb.yaxis,color='blue',label='QPB')
+axbig.plot(dety_spf.xaxis,dety_spf.yaxis,color='green',label='SPF')
+axbig.plot(dety_bkg.xaxis,dety_bkg.yaxis,color='red',label='Bkg')
+axbig.set_yscale('log')
+axbig.set_ylim(bottom=1)
+axbig.set_xlabel('DETY')
+axbig.legend(loc='best')
+fig.savefig("%s/%s_%s_dety_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+axbig.remove()
+
+
+MakeMapProjection(image_galactic_sci, galx_sci, galy_sci)
+
+fig.clf()
+axbig = fig.add_subplot()
+axbig.errorbar(galx_sci.xaxis,galx_sci.yaxis,yerr=galx_sci.yerr,color='k',label='Data')
+axbig.set_xlabel('Gal. l')
+axbig.legend(loc='best')
+fig.savefig("%s/%s_%s_galx_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+axbig.remove()
+
+fig.clf()
+axbig = fig.add_subplot()
+axbig.errorbar(galy_sci.xaxis,galy_sci.yaxis,yerr=galy_sci.yerr,color='k',label='Data')
+axbig.set_xlabel('Gal. b')
+axbig.legend(loc='best')
+fig.savefig("%s/%s_%s_galy_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+axbig.remove()
+
 
 
 energy_threshold = 2000
@@ -459,39 +592,40 @@ def line_emission_func(x,A,E0,sigma):
 def emission_model(x,A_nontherm,gamma_nontherm,A_Fe_K_alpha,E_Fe_K_alpha,sigma):
     return continuum_func(x,A_nontherm,gamma_nontherm) + line_emission_func(x,A_Fe_K_alpha,E_Fe_K_alpha,sigma)
 
-start = (1e3,2,200,6600,107)
-limit_upper = (1e6,10,1e6,7000,117)
-limit_lower = (0,0,0,6000,97)
-popt, pcov = curve_fit(emission_model,energy_axis,res_count_axis,p0=start,sigma=res_count_error,absolute_sigma=True,bounds=(limit_lower,limit_upper))
-
-model_fit = emission_model(energy_axis, *popt)
-
-powerlaw_amp = popt[0]
-powerlaw_idx = popt[1]
-Fe_K_alpha_amp = popt[2]
-Fe_K_alpha_E = popt[3]
-E_sigma = popt[4]
-print ('powerlaw_amp = %s'%(powerlaw_amp))
-print ('powerlaw_idx = %s'%(powerlaw_idx))
-print ('Fe_K_alpha_amp = %s'%(Fe_K_alpha_amp))
-print ('Fe_K_alpha_E = %s'%(Fe_K_alpha_E))
-print ('E_sigma = %s'%(E_sigma))
-
-fig, ax = plt.subplots()
-figsize_x = 8.
-figsize_y = 6.
-fig.set_figheight(figsize_y)
-fig.set_figwidth(figsize_x)
-
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(energy_axis,res_count_axis,yerr=res_count_error,color='k',label='Data')
-axbig.plot(energy_axis,model_fit,color='red',label='Model')
-axbig.set_yscale('log')
-axbig.set_ylim(bottom=1)
-axbig.set_xlabel('Energy [eV]')
-axbig.legend(loc='best')
-fig.savefig("../output_plots/fit_model.png",bbox_inches='tight')
-axbig.remove()
+if do_fit:
+    start = (1e3,2,200,6600,107)
+    limit_upper = (1e6,10,1e6,7000,117)
+    limit_lower = (0,0,0,6000,97)
+    popt, pcov = curve_fit(emission_model,energy_axis,res_count_axis,p0=start,sigma=res_count_error,absolute_sigma=True,bounds=(limit_lower,limit_upper))
+    
+    model_fit = emission_model(energy_axis, *popt)
+    
+    powerlaw_amp = popt[0]
+    powerlaw_idx = popt[1]
+    Fe_K_alpha_amp = popt[2]
+    Fe_K_alpha_E = popt[3]
+    E_sigma = popt[4]
+    print ('powerlaw_amp = %s'%(powerlaw_amp))
+    print ('powerlaw_idx = %s'%(powerlaw_idx))
+    print ('Fe_K_alpha_amp = %s'%(Fe_K_alpha_amp))
+    print ('Fe_K_alpha_E = %s'%(Fe_K_alpha_E))
+    print ('E_sigma = %s'%(E_sigma))
+    
+    fig, ax = plt.subplots()
+    figsize_x = 8.
+    figsize_y = 6.
+    fig.set_figheight(figsize_y)
+    fig.set_figwidth(figsize_x)
+    
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(energy_axis,res_count_axis,yerr=res_count_error,color='k',label='Data')
+    axbig.plot(energy_axis,model_fit,color='red',label='Model')
+    axbig.set_yscale('log')
+    axbig.set_ylim(bottom=1)
+    axbig.set_xlabel('Energy [eV]')
+    axbig.legend(loc='best')
+    fig.savefig("../output_plots/fit_model.png",bbox_inches='tight')
+    axbig.remove()
 
 print ('I am done.')

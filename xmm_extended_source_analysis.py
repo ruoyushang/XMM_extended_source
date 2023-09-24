@@ -88,6 +88,7 @@ source_radius = 1000
 ring_inner_radius = 1500
 ring_outer_radius = 6000
 
+sample_scale = 10.
 
 src_ra = 0
 src_dec = 0
@@ -442,8 +443,12 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
             if idx!=2: continue
             sp_free_data += data_pattern[ch].yaxis[idx]
             sp_free_qpb  += qpb_pattern[ch].yaxis[idx]
-        xray_qpb_ratio += [max(sp_free_data/sp_free_qpb-1.,0.)]
-        spfree_data_qpb_ratio += [sp_free_data/sp_free_qpb]
+        if sp_free_qpb==0.:
+            xray_qpb_ratio += [0.]
+            spfree_data_qpb_ratio += [0.]
+        else:
+            xray_qpb_ratio += [max(sp_free_data/sp_free_qpb-1.,0.)]
+            spfree_data_qpb_ratio += [sp_free_data/sp_free_qpb]
         data = 0.
         qpb = 0.
         for idx in range(0,len(data_pattern[ch].xaxis)):
@@ -452,7 +457,10 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
             if idx>4: continue
             data += data_pattern[ch].yaxis[idx]
             qpb  += qpb_pattern[ch].yaxis[idx]
-        data_qpb_ratio += [data/qpb]
+        if qpb==0.:
+            data_qpb_ratio += [0.]
+        else:
+            data_qpb_ratio += [data/qpb]
 
     sp_scale_list = []
     max_sp_scale_list = []
@@ -463,9 +471,13 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
         qpb_cnt = qpb_pattern[ch].integral()
         xray_cnt = xray_qpb_ratio[ch-1]*xray_pattern[ch].integral()
         raw_spf_cnt = spf_pattern[ch].integral()
-        sp_scale = max((data_cnt-qpb_cnt-xray_cnt)/raw_spf_cnt,0.)
+        if raw_spf_cnt==0.:
+            sp_scale = 0.
+            max_sp_scale = 0.
+        else:
+            sp_scale = max((data_cnt-qpb_cnt-xray_cnt)/raw_spf_cnt,0.)
+            max_sp_scale = max((data_cnt-qpb_cnt)/raw_spf_cnt,0.)
         sp_scale_list += [sp_scale]
-        max_sp_scale = max((data_cnt-qpb_cnt)/raw_spf_cnt,0.)
         max_sp_scale_list += [max_sp_scale]
 
     min_data_qpb_diff = 1e10
@@ -1117,6 +1129,18 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         off_pattern_fwc_fov[ch].scale(fwc_2_sci_ratio)
         off_pattern_fwc_cor[ch].scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
 
+        off_image_sci_cor[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
+        off_image_spf_fov[ch].scale(time_expo_sci_fov/time_expo_spf_fov)
+        off_image_spf_cor[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_spf_cor)
+        off_image_fwc_fov[ch].scale(fwc_2_sci_ratio)
+        off_image_fwc_cor[ch].scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
+    
+        off_detx_sci_cor[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
+        off_detx_spf_fov[ch].scale(time_expo_sci_fov/time_expo_spf_fov)
+        off_detx_spf_cor[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor*time_expo_sci_fov/time_expo_spf_cor)
+        off_detx_fwc_fov[ch].scale(fwc_2_sci_ratio)
+        off_detx_fwc_cor[ch].scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
+    
     if diagnostic_plots:
         fig.clf()
         axbig = fig.add_subplot()
@@ -1165,13 +1189,21 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     sp_pattern_fov_template = []
     sp_spectrum_fov_template = []
+    sp_image_fov_template = []
+    sp_detx_fov_template = []
     for ch in range(0,len(energy_range)):
         sp_pattern_fov_template += [MyArray1D(bin_start=pattern_low,bin_end=pattern_high,pixel_scale=pattern_scale)]
         sp_spectrum_fov_template += [MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)]
+        sp_image_fov_template += [MyArray2D()]
+        sp_detx_fov_template += [MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)]
     
     for ch in range(0,len(energy_range)):
         sp_spectrum_fov_template[ch].add(off_spectrum_spf_fov[ch])
         sp_spectrum_fov_template[ch].add(off_spectrum_sci_fov[ch],factor=-1.)
+        sp_image_fov_template[ch].add(off_image_spf_fov[ch])
+        sp_image_fov_template[ch].add(off_image_sci_fov[ch],factor=-1.)
+        sp_detx_fov_template[ch].add(off_detx_spf_fov[ch])
+        sp_detx_fov_template[ch].add(off_detx_sci_fov[ch],factor=-1.)
         ch_norm = sp_spectrum_fov_template[ch].integral()/off_pattern_spf_fov[0].integral()
         sp_pattern_fov_template[ch].add(off_pattern_spf_fov[0],factor=ch_norm)
         sp_pattern_fov_template[ch].add(off_pattern_sci_fov[0],factor=-1.*ch_norm)
@@ -1381,17 +1413,6 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov_mask,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
         
-    sp_detx_fov_template = []
-    sp_image_fov_template = []
-    for ch in range(0,len(energy_range)):
-        sp_detx_fov_template += [MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)]
-        sp_image_fov_template += [MyArray2D()]
-    for ch in range(0,len(energy_range)):
-        sp_pattern_norm = sp_pattern_fov_template[ch].integral()
-        qpb_pattern_norm = qpb_pattern_fov_template[ch].integral()
-        sp_detx_fov_template[ch].add(on_detx_fwc_fov[ch],sp_pattern_norm/qpb_pattern_norm)
-        sp_image_fov_template[ch].add(on_image_fwc_fov[ch],sp_pattern_norm/qpb_pattern_norm)
-
     for ch in range(1,len(energy_range)):
         xray_scale = xray_cnt_list[ch-1]/xray_pattern_fov_template[ch].integral()
         xray_pattern_fov_template[ch].scale(xray_scale)
@@ -1441,9 +1462,9 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         qpb_image_fov_template_sum.add(qpb_image_fov_template[ch])
         on_image_sci_fov_bkg_sum.add(sp_image_fov_template[ch])
         on_image_sci_fov_bkg_sum.add(qpb_image_fov_template[ch])
-    on_image_sci_fov_bkg_sum.flattening()
-    sp_image_fov_template_sum.flattening()
-    qpb_image_fov_template_sum.flattening()
+    #on_image_sci_fov_bkg_sum.flattening()
+    #sp_image_fov_template_sum.flattening()
+    #qpb_image_fov_template_sum.flattening()
 
     all_pattern_fov_template = []
     for ch in range(0,len(energy_range)):
@@ -1550,7 +1571,7 @@ for ccd in range(0,len(ana_ccd_bins)):
             pix_detx = ana_output_image[1].xaxis[idx_x]
             pix_dety = ana_output_image[1].yaxis[idx_y]
             sum_bkg = ana_output_image[1].zaxis[idx_x,idx_y]
-            for evt in range(0,int(10*sum_bkg)):
+            for evt in range(0,round(sample_scale*sum_bkg)):
                 evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
                 evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
                 #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
@@ -1594,7 +1615,7 @@ for ccd in range(0,len(ana_ccd_bins)):
             pix_detx = ana_output_image[2].xaxis[idx_x]
             pix_dety = ana_output_image[2].yaxis[idx_y]
             sum_bkg = ana_output_image[2].zaxis[idx_x,idx_y]
-            for evt in range(0,int(10*sum_bkg)):
+            for evt in range(0,round(sample_scale*sum_bkg)):
                 evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
                 evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
                 #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
@@ -1638,7 +1659,7 @@ for ccd in range(0,len(ana_ccd_bins)):
             pix_detx = ana_output_image[3].xaxis[idx_x]
             pix_dety = ana_output_image[3].yaxis[idx_y]
             sum_bkg = ana_output_image[3].zaxis[idx_x,idx_y]
-            for evt in range(0,int(10*sum_bkg)):
+            for evt in range(0,round(sample_scale*sum_bkg)):
                 evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
                 evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
                 #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
