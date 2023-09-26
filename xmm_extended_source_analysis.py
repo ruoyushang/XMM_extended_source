@@ -1454,17 +1454,18 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         on_detx_sci_fov_bkg_sum.add(sp_detx_fov_template[ch])
         on_detx_sci_fov_bkg_sum.add(qpb_detx_fov_template[ch])
     
-    on_image_sci_fov_bkg_sum = MyArray2D()
     sp_image_fov_template_sum = MyArray2D()
     qpb_image_fov_template_sum = MyArray2D()
     for ch in range(1,len(energy_range)):
         sp_image_fov_template_sum.add(sp_image_fov_template[ch])
         qpb_image_fov_template_sum.add(qpb_image_fov_template[ch])
+    #sp_image_fov_template_sum.flattening()
+    qpb_image_fov_template_sum.flattening()
+
+    on_image_sci_fov_bkg_sum = MyArray2D()
+    for ch in range(1,len(energy_range)):
         on_image_sci_fov_bkg_sum.add(sp_image_fov_template[ch])
         on_image_sci_fov_bkg_sum.add(qpb_image_fov_template[ch])
-    #on_image_sci_fov_bkg_sum.flattening()
-    #sp_image_fov_template_sum.flattening()
-    #qpb_image_fov_template_sum.flattening()
 
     all_pattern_fov_template = []
     for ch in range(0,len(energy_range)):
