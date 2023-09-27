@@ -79,8 +79,8 @@ energy_array = [2000,4000,6000,8000,10000,12000]
 #ana_ccd_bins = [1]
 ana_ccd_bins = [0]
 
-#qpb_calibration = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-qpb_calibration = [1.0, 1.316644016880023, 1.165767178219302, 1.1071213894776806, 1.076673512002368, 1.0718047208971304]
+qpb_calibration = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+#qpb_calibration = [1.0, 1.316644016880023, 1.165767178219302, 1.1071213894776806, 1.076673512002368, 1.0718047208971304]
 
 output_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
 
@@ -252,14 +252,34 @@ if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
 fwc_2_sci_ratio = 0.3
 
 
-def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=False,evt_filter='',energy_range=[200,12000],ccd_id=0):
+def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=False,evt_filter='',energy_range=[200,12000],ccd_id=0):
 
     # how to read events:
     # https://docs.astropy.org/en/stable/generated/examples/io/fits-tables.html#accessing-data-stored-as-a-table-in-a-multi-extension-fits-mef-file
 
-    #rmf_table = Table.read(rmf_name, hdu=1)
+
+    time_frac = 1.
+    if not mask_lc==None:
+        time_frac = 0.
+        total_time = 0.
+        select_time = 0.
+        for t in range(0,len(mask_lc.xaxis)):
+            total_time += 1.
+            zscore = mask_lc.yaxis[t]
+            if 'sp-veto' in evt_filter:
+                if zscore>0: 
+                    continue
+                else:
+                    select_time += 1.
+            if 'sp-select' in evt_filter:
+                if zscore==0: 
+                    continue
+                else:
+                    select_time += 1.
+        time_frac = select_time/total_time
 
     print ('read file %s'%(filename))
+    print (f'{evt_filter}, time_frac = {time_frac}')
     hdu_list = fits.open(filename)
     #print (filename)
     #print (hdu_list.info())
@@ -284,7 +304,7 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=Fa
 
     time_start = events[0]['TIME']
     time_end = events[len(events)-1]['TIME']
-    obs_duration = time_end-time_start
+    obs_duration = (time_end-time_start)*time_frac
 
     evt_detx_list = []
     evt_dety_list = []
@@ -301,12 +321,6 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=Fa
 
         evt_time = events[evt]['TIME']
         evt_pattern = events[evt]['PATTERN']
-
-        #evt_pha = events[evt]['PHA']
-        #if evt_pha>=2400: continue
-        #energy_lo = rmf_table[evt_pha]['ENERG_LO']
-        #energy_hi = rmf_table[evt_pha]['ENERG_HI']
-        #evt_energy = 0.5*(energy_lo+energy_hi)*1000.
 
         evt_pi = events[evt]['PI']
         #if evt_pi<energy_range[0]: continue
@@ -421,8 +435,34 @@ def read_event_file(filename,rmf_name,mask_lc=None,mask_map=None,write_events=Fa
         my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
         my_table.header['REF_RA'] = ref_sky[0][0]
         my_table.header['REF_DEC'] = ref_sky[0][1]
+        my_table.header['obs_duration'] = obs_duration
         my_table.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
         #fits.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), my_table, overwrite=True)
+
+        energy_array_for_area = [2000,4000,6000,8000,10000,12000]
+        energy_list = []
+        area_list = []
+        arf_in_table = Table.read(arf_name, hdu=1)
+        for e in range(0,len(energy_array_for_area)-1):
+            energy_lo = energy_array_for_area[e]
+            energy_hi = energy_array_for_area[e+1]
+            entry_cnt = 0.
+            avg_area = 0.
+            for entry in range(0,len(arf_in_table)):
+                energy = 0.5*(arf_in_table[entry]['ENERG_LO']+arf_in_table[entry]['ENERG_HI'])*1000.
+                if energy<energy_lo: continue
+                if energy>=energy_hi: continue
+                area = arf_in_table[entry]['SPECRESP']
+                avg_area += area
+                entry_cnt += 1.
+            if entry_cnt>0:
+                avg_area = avg_area/entry_cnt
+            energy_list += [energy_lo]
+            area_list += [avg_area]
+        col_energy = fits.Column(name='ENERGY', array=energy_list, format='D')
+        col_area = fits.Column(name='AREA', array=area_list, format='D')
+        arf_out_table = fits.BinTableHDU.from_columns([col_energy,col_area],name='ENTRY')
+        arf_out_table.writeto('%s/sci_area_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
 
     return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array]
 
@@ -714,26 +754,26 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     xray_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-fov-evt.fits'%(xray_sample,xray_obsID,detector)
     xray_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(xray_sample,xray_obsID,detector)
     xray_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(xray_sample,xray_obsID,detector)
-    xray_rmf_filename = '../%s/%s/analysis/%s-src-rmf.fits'%(xray_sample,xray_obsID,detector)
+    xray_arf_filename = '../%s/%s/analysis/%s-fov-arf.fits'%(xray_sample,xray_obsID,detector)
     
     off_sci_fov_evt_filename = '../%s/%s/analysis/%s-%s-evt.fits'%(off_sample,off_obsID,detector,on_filter)
     off_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-%s-evt.fits'%(off_sample,off_obsID,detector,on_filter)
     off_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(off_sample,off_obsID,detector)
     off_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(off_sample,off_obsID,detector)
-    off_rmf_filename = '../%s/%s/analysis/%s-src-rmf.fits'%(off_sample,off_obsID,detector)
+    off_arf_filename = '../%s/%s/analysis/%s-fov-arf.fits'%(off_sample,off_obsID,detector)
     
     on_sci_fov_evt_filename = '../%s/%s/analysis/%s-%s-evt.fits'%(on_sample,on_obsID,detector,on_filter)
     on_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-%s-evt.fits'%(on_sample,on_obsID,detector,on_filter)
     on_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(on_sample,on_obsID,detector)
     on_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(on_sample,on_obsID,detector)
-    on_rmf_filename = '../%s/%s/analysis/%s-src-rmf.fits'%(on_sample,on_obsID,detector)
+    on_arf_filename = '../%s/%s/analysis/%s-fov-arf.fits'%(on_sample,on_obsID,detector)
 
     #print ('prepare xray sample time cuts')
     #
-    #output_all_fov = read_event_file(xray_sci_fov_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    #output_all_cor = read_event_file(xray_sci_cor_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    #output_fwc_fov = read_event_file(xray_fwc_fov_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    #output_fwc_cor = read_event_file(xray_fwc_cor_evt_filename,xray_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    #output_all_fov = read_event_file(xray_sci_fov_evt_filename,xray_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    #output_all_cor = read_event_file(xray_sci_cor_evt_filename,xray_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    #output_fwc_fov = read_event_file(xray_fwc_fov_evt_filename,xray_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    #output_fwc_cor = read_event_file(xray_fwc_cor_evt_filename,xray_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
 
     #xray_duration_all_fov = output_all_fov[0]
     #xray_evt_count_all_fov = output_all_fov[1]
@@ -786,8 +826,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     #print ('apply x-ray sample space and time masks')
     #
-    #output_sci_source = read_event_file(xray_sci_fov_evt_filename,xray_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto source',energy_range=energy_range,ccd_id=0)
-    #output_sci_ring   = read_event_file(xray_sci_fov_evt_filename,xray_rmf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto ring',energy_range=energy_range,ccd_id=0)
+    #output_sci_source = read_event_file(xray_sci_fov_evt_filename,xray_arf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto source',energy_range=energy_range,ccd_id=0)
+    #output_sci_ring   = read_event_file(xray_sci_fov_evt_filename,xray_arf_filename,mask_lc=mask_lc,mask_map=None,evt_filter='sp-veto ring',energy_range=energy_range,ccd_id=0)
     #
     #xray_duration_sci_source = output_sci_source[0]
     #xray_evt_count_sci_source = output_sci_source[1]
@@ -821,12 +861,12 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('prepare on sample time cuts')
     
-    output_all_nsp = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
-    output_fwc_nsp = read_event_file(on_fwc_fov_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
-    output_all_fov = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_all_cor = read_event_file(on_sci_cor_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,on_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_all_nsp = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
+    output_fwc_nsp = read_event_file(on_fwc_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
+    output_all_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_all_cor = read_event_file(on_sci_cor_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
     
     on_duration_all_nsp = output_all_nsp[0]
     on_evt_count_all_nsp = output_all_nsp[1]
@@ -900,8 +940,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     on_mask_lc = make_timecut_mask(on_lightcurve_all_fov,on_lightcurve_all_cor,on_lightcurve_fwc_cor) 
 
-    output_sci_fov = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
-    output_spf_fov = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
+    output_sci_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
+    output_spf_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
     on_evt_count_sci_fov = output_sci_fov[1]
     on_evt_count_spf_fov = output_spf_fov[1]
     
@@ -915,7 +955,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         off_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-%s-evt.fits'%(off_sample,off_obsID,detector,on_filter)
         off_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(off_sample,off_obsID,detector)
         off_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(off_sample,off_obsID,detector)
-        off_rmf_filename = '../%s/%s/analysis/%s-src-rmf.fits'%(off_sample,off_obsID,detector)
+        off_arf_filename = '../%s/%s/analysis/%s-fov-arf.fits'%(off_sample,off_obsID,detector)
 
     time_pix_frac_mask = on_mask_lc.get_pixel_fraction()
     print ('time_pix_frac_mask = %s'%(time_pix_frac_mask))
@@ -928,19 +968,19 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         off_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-%s-evt.fits'%(off_sample,off_obsID,detector,on_filter)
         off_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(off_sample,off_obsID,detector)
         off_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(off_sample,off_obsID,detector)
-        off_rmf_filename = '../%s/%s/analysis/%s-src-rmf.fits'%(off_sample,off_obsID,detector)
+        off_arf_filename = '../%s/%s/analysis/%s-fov-arf.fits'%(off_sample,off_obsID,detector)
     if not SP_flare_mask:
         on_mask_lc = None
 
     print ('use off sample: %s'%(off_sci_fov_evt_filename))
     print ('prepare off sample time cuts')
     
-    output_all_nsp = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
-    output_fwc_nsp = read_event_file(off_fwc_fov_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
-    output_all_fov = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_all_cor = read_event_file(off_sci_cor_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_rmf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_all_nsp = read_event_file(off_sci_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
+    output_fwc_nsp = read_event_file(off_fwc_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
+    output_all_fov = read_event_file(off_sci_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_all_cor = read_event_file(off_sci_cor_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
     
     off_duration_all_nsp = output_all_nsp[0]
     off_evt_count_all_nsp = output_all_nsp[1]
@@ -1028,8 +1068,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('apply off sample space and time masks')
     
-    output_sci_fov = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
-    output_sci_cor = read_event_file(off_sci_cor_evt_filename,off_rmf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
+    output_sci_fov = read_event_file(off_sci_fov_evt_filename,off_arf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
+    output_sci_cor = read_event_file(off_sci_cor_evt_filename,off_arf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
     
     off_duration_sci_fov = output_sci_fov[0]
     off_evt_count_sci_fov = output_sci_fov[1]
@@ -1047,8 +1087,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     off_detx_sci_cor = output_sci_cor[5]
     off_image_sci_cor = output_sci_cor[6]
     
-    output_spf_fov = read_event_file(off_sci_fov_evt_filename,off_rmf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
-    output_spf_cor = read_event_file(off_sci_cor_evt_filename,off_rmf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
+    output_spf_fov = read_event_file(off_sci_fov_evt_filename,off_arf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
+    output_spf_cor = read_event_file(off_sci_cor_evt_filename,off_arf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
     
     off_duration_spf_fov = output_spf_fov[0]
     off_evt_count_spf_fov = output_spf_fov[1]
@@ -1066,8 +1106,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     off_detx_spf_cor = output_spf_cor[5]
     off_image_spf_cor = output_spf_cor[6]
     
-    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_rmf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='',energy_range=energy_range)
-    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_rmf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='',energy_range=energy_range)
+    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_arf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='',energy_range=energy_range)
+    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_arf_filename,mask_lc=off_mask_lc,mask_map=None,evt_filter='',energy_range=energy_range)
     
     off_duration_fwc_fov = output_fwc_fov[0]
     off_evt_count_fwc_fov = output_fwc_fov[1]
@@ -1210,8 +1250,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('apply on sample space and time masks')
     
-    output_sci_fov = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=None,write_events=True,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
-    output_sci_cor = read_event_file(on_sci_cor_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    output_sci_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,write_events=True,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    output_sci_cor = read_event_file(on_sci_cor_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
     
     on_duration_sci_fov = output_sci_fov[0]
     on_evt_count_sci_fov = output_sci_fov[1]
@@ -1229,8 +1269,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_detx_sci_cor = output_sci_cor[5]
     on_image_sci_cor = output_sci_cor[6]
     
-    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
-    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
     
     on_duration_fwc_fov = output_fwc_fov[0]
     on_evt_count_fwc_fov = output_fwc_fov[1]
@@ -1253,8 +1293,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     find_point_sources(on_image_sci_fov[0],image_det_mask)
     find_point_sources(on_image_sci_fov[0],image_det_mask)
 
-    output_sci_fov_mask = read_event_file(on_sci_fov_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=image_det_mask,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
-    output_fwc_fov_mask = read_event_file(on_fwc_fov_evt_filename,on_rmf_filename,mask_lc=on_mask_lc,mask_map=image_det_mask,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
+    output_sci_fov_mask = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=image_det_mask,evt_filter='sp-veto',energy_range=energy_range,ccd_id=ccd_id)
+    output_fwc_fov_mask = read_event_file(on_fwc_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=image_det_mask,evt_filter='',energy_range=energy_range,ccd_id=ccd_id)
 
     on_duration_sci_fov_mask = output_sci_fov_mask[0]
     on_evt_count_sci_fov_mask = output_sci_fov_mask[1]

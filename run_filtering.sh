@@ -55,9 +55,8 @@ mv $mos2_gti mos2-gti-loose.fits
 # select FoV events
 #em_fov_cut='(PATTERN<=12)&&(PI in ['$ELOW':'$EHIGH'])&&(FLAG & 0x766ba000)==0'
 em_fov_cut='(PI in ['$ELOW':'$EHIGH'])&&(FLAG & 0x766ba000)==0'
-evselect table=mos1.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos1-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes 
-evselect table=mos2.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos2-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes
-
+evselect table=mos1.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos1-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes   
+evselect table=mos2.fits withfilteredset=yes filtertype=expression expression="$em_fov_cut" filteredset=mos2-fov-evt.fits keepfilteroutput=yes updateexposure=yes filterexposure=yes 
 
 # select corner events
 #em_cor_cut='(PATTERN<=12)&&(PI in ['$ELOW':'$EHIGH'])&&((FLAG & 0x766aa000)==0)&&((FLAG & 0x766ba000)!=0)'

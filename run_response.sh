@@ -8,10 +8,10 @@ echo $SAS_ODF
 
 cd analysis/
 
-out_mos1_evt_file='mos1-reg1-evt.fits'
-out_mos2_evt_file='mos2-reg1-evt.fits'
-#mosspectra eventfile=$out_mos1_evt_file keepinterfiles=yes pattern=12 elow=200 ehigh=12000 ccds="T T T F F F T"
-#mosspectra eventfile=$out_mos2_evt_file keepinterfiles=yes pattern=12 elow=200 ehigh=12000 ccds="T T T T T T T"
-mosback inspecfile=mos1S001-fovt.pi elow=200 ehigh=12000 ccds="T T T F F F T" 
-mosback inspecfile=mos2S002-fovt.pi elow=200 ehigh=12000 ccds="T T T T T T T" 
+evselect table=mos1-fov-evt.fits expression='((DETX,DETY) in CIRCLE(0,0,4000))' withspectrumset=yes spectrumset=mos1-fov-pi.fits specchannelmin=0 specchannelmax=11999 
+evselect table=mos2-fov-evt.fits expression='((DETX,DETY) in CIRCLE(0,0,4000))' withspectrumset=yes spectrumset=mos2-fov-pi.fits specchannelmin=0 specchannelmax=11999
 
+rmfgen rmfset=mos1-fov-rmf.fits spectrumset=mos1-fov-pi.fits
+arfgen arfset=mos1-fov-arf.fits spectrumset=mos1-fov-pi.fits withrmfset=yes rmfset=mos1-fov-rmf.fits extendedsource=yes
+rmfgen rmfset=mos2-fov-rmf.fits spectrumset=mos2-fov-pi.fits
+arfgen arfset=mos2-fov-arf.fits spectrumset=mos2-fov-pi.fits withrmfset=yes rmfset=mos2-fov-rmf.fits extendedsource=yes
