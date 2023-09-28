@@ -201,7 +201,7 @@ class MyArray1D:
     def get_bin_content(self, value_x):
         key_idx_x = 0
         for idx_x in range(0,len(self.xaxis)-1):
-            if self.xaxis[idx_x]<=value_x and self.xaxis[idx_x+1]>value_x:
+            if value_x>=self.xaxis[idx_x]:
                 key_idx_x = idx_x
         return self.yaxis[key_idx_x]
     def normalize(self):

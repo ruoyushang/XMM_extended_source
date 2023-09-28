@@ -32,14 +32,14 @@ import common_functions
 #on_obsID = 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
 
 on_sample = '3HWC_J1928_p178'
-on_obsID = 'ID0902120101'
+#on_obsID = 'ID0902120101'
 #on_obsID = 'ID0503740101'
 #on_obsID = 'ID0830192001'
-#on_obsID = 'ID0861880101'
 #on_obsID = 'ID0406730101'
 #on_obsID = 'ID0762980101'
 #on_obsID = 'ID0742710301'
-#on_obsID = 'ID0822330301'
+on_obsID = 'ID0822330301'
+#on_obsID = 'ID0861880101' # 57% SPF
 #on_obsID = 'ID0841190101' # bright source
 #on_obsID = 'ID0851181701' # bright source
 #on_obsID = 'ID0724270101' # SNR with escaped CRs?
@@ -123,35 +123,52 @@ def get_cxb_spectrum(hist_cxb):
     cxb_measurement += [[0.8917712578452764, 0.48677549677590903, 0.1328807248329376, -0.15747818141105654, -0.051373285693748015]]
     cxb_measurement += [[1.1162834709255116, 0.4128565130768429, 0.2193164617501438, 0.04738693633387427, -0.013712703188156183]]
     cxb_measurement += [[1.3413456972931797, 0.4922646398350615, 0.13633582524099525, 0.045889076594834675, -0.06825667292332441]]
+
+    hist_cxb_measurement = MyArray1D(bin_start=energy_array[0],bin_end=energy_array[len(energy_array)-1],pixel_scale=energy_array[1]-energy_array[0])
+    for ch in range(0,len(energy_array)-1):
+        n_samples = 0.
+        avg_cxb = 0.
+        for m in range(0,len(cxb_measurement)):
+            n_samples += 1.
+            avg_cxb += cxb_measurement[m][ch]
+        avg_cxb = avg_cxb/n_samples
+        hist_cxb_measurement.yaxis[ch] = avg_cxb
+    #print (f'hist_cxb_measurement.yaxis:')
+    #print (f'{hist_cxb_measurement.yaxis}')
+
     for x in range(0,len(hist_cxb.xaxis)):
         energy = hist_cxb.xaxis[x]
-        avg_cxb = 0.
-        n_samples = 0.
-        for ch in range(0,len(energy_array)-1):
-            if energy<energy_array[ch]: continue
-            if energy>=energy_array[ch+1]: continue
-            for m in range(0,len(cxb_measurement)):
-                avg_cxb += cxb_measurement[m][ch]
-                n_samples += 1.
-            avg_cxb = avg_cxb/n_samples
-        hist_cxb.yaxis[x] = avg_cxb
+        if energy<energy_cut_lower: continue
+        if energy>energy_cut_upper: continue
+        hist_cxb.yaxis[x] = hist_cxb_measurement.get_bin_content(energy)
         
 def get_gxb_spectrum(hist_gxb):
 
     gxb_measurement = []
     gxb_measurement += [[1.3516506948299853, 0.5873110283798142, 0.20035191142546557, 0.09132174038363583, 0.14828325188954022]]
+    gxb_measurement += [[2.096893323374876, 0.6825092676677877, 0.20085330998619902, -0.12528111058407812, -0.25872850490039534]]
+    gxb_measurement += [[1.721944994819511, 0.6134754511413101, 0.10109597873251537, -0.01706314759658094, -0.15607266246362891]]
+    gxb_measurement += [[1.764603682517303, 0.5002385196933191, -0.033018911413896256, -0.23136404597757654, -0.17491760224497677]]
+    gxb_measurement += [[1.7929416062600456, 0.8932197038025826, 0.30368136538555723, 0.1469531272816006, -0.01657585506453758]]
+    gxb_measurement += [[2.0574467391937805, 1.2317014735485052, 0.6749214331887166, 0.2727590099893934, 0.14625001792403572]]
+
+    hist_gxb_measurement = MyArray1D(bin_start=energy_array[0],bin_end=energy_array[len(energy_array)-1],pixel_scale=energy_array[1]-energy_array[0])
+    for ch in range(0,len(energy_array)-1):
+        n_samples = 0.
+        avg_gxb = 0.
+        for m in range(0,len(gxb_measurement)):
+            n_samples += 1.
+            avg_gxb += gxb_measurement[m][ch]
+        avg_gxb = avg_gxb/n_samples
+        hist_gxb_measurement.yaxis[ch] = avg_gxb
+    #print (f'hist_gxb_measurement.yaxis:')
+    #print (f'{hist_gxb_measurement.yaxis}')
+
     for x in range(0,len(hist_gxb.xaxis)):
         energy = hist_gxb.xaxis[x]
-        avg_gxb = 0.
-        n_samples = 0.
-        for ch in range(0,len(energy_array)-1):
-            if energy<energy_array[ch]: continue
-            if energy>=energy_array[ch+1]: continue
-            for m in range(0,len(gxb_measurement)):
-                avg_gxb += gxb_measurement[m][ch]
-                n_samples += 1.
-            avg_gxb = avg_gxb/n_samples
-        hist_gxb.yaxis[x] = avg_gxb
+        if energy<energy_cut_lower: continue
+        if energy>energy_cut_upper: continue
+        hist_gxb.yaxis[x] = hist_gxb_measurement.get_bin_content(energy)
         
 def ConvertDet2Sky(target_det,origin_sky,origin_det,mtx_conv_det_2_sky):
 
@@ -662,10 +679,10 @@ for ccd in range(0,len(ana_ccd_bins)):
             if mask==1: continue
         areatime = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
         spectrum_sci.fill(evt_pi,weight=1./areatime)
-        image_det_xry.fill(evt_detx,evt_dety)
-        image_icrs_xry.fill(evt_ra,evt_dec)
-        detx_sci.fill(evt_detx)
-        dety_sci.fill(evt_dety)
+        image_det_xry.fill(evt_detx,evt_dety,weight=1./areatime)
+        image_icrs_xry.fill(evt_ra,evt_dec,weight=1./areatime)
+        detx_sci.fill(evt_detx,weight=1./areatime)
+        dety_sci.fill(evt_dety,weight=1./areatime)
 
     qpb_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     qpb_hdu_list = fits.open(qpb_filename)
@@ -686,11 +703,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         areatime = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
         spectrum_qpb.fill(evt_pi,weight=1./areatime*1./sample_scale)
         spectrum_det_bkg.fill(evt_pi,weight=1./areatime*1./sample_scale)
-        detx_qpb.fill(evt_detx,weight=1./sample_scale)
-        dety_qpb.fill(evt_dety,weight=1./sample_scale)
+        detx_qpb.fill(evt_detx,weight=1./areatime*1./sample_scale)
+        dety_qpb.fill(evt_dety,weight=1./areatime*1./sample_scale)
 
-        image_det_qpb.fill(evt_detx,evt_dety,weight=1./sample_scale)
-        image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./sample_scale)
+        image_det_qpb.fill(evt_detx,evt_dety,weight=1./areatime*1./sample_scale)
+        image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./areatime*1./sample_scale)
 
     spf_filename = '%s/spf_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
     spf_hdu_list = fits.open(spf_filename)
@@ -711,11 +728,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         areatime = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
         spectrum_spf.fill(evt_pi,weight=1./areatime*1./sample_scale)
         spectrum_det_bkg.fill(evt_pi,weight=1./areatime*1./sample_scale)
-        detx_spf.fill(evt_detx,weight=1./sample_scale)
-        dety_spf.fill(evt_dety,weight=1./sample_scale)
+        detx_spf.fill(evt_detx,weight=1./areatime*1./sample_scale)
+        dety_spf.fill(evt_dety,weight=1./areatime*1./sample_scale)
 
-        image_det_spf.fill(evt_detx,evt_dety,weight=1./sample_scale)
-        image_icrs_spf.fill(evt_ra,evt_dec,weight=1./sample_scale)
+        image_det_spf.fill(evt_detx,evt_dety,weight=1./areatime*1./sample_scale)
+        image_icrs_spf.fill(evt_ra,evt_dec,weight=1./areatime*1./sample_scale)
 
 sci_bkg_ratio = []
 for ch in range(0,len(energy_array)-1):
@@ -731,27 +748,27 @@ bkg_cnt = spectrum_det_bkg.integral()
 spf_cnt = spectrum_spf.integral()
 print (f'spf_cnt/bkg_cnt = {spf_cnt/bkg_cnt}')
 
-cxb_measurement = []
-qpb_measurement = []
+cxb_measurement_tmp = []
+qpb_measurement_tmp = []
 for ch in range(0,len(energy_array)-1):
     sci_cnt = spectrum_sci.integral(integral_range=[energy_array[ch],energy_array[ch+1]])
     bkg_cnt = spectrum_det_bkg.integral(integral_range=[energy_array[ch],energy_array[ch+1]])
     qpb_cnt = spectrum_qpb.integral(integral_range=[energy_array[ch],energy_array[ch+1]])
     nbins = (energy_array[ch+1]-energy_array[ch])/ch_scale
-    cxb_measurement += [(sci_cnt-bkg_cnt)/nbins]
-    qpb_measurement += [qpb_cnt/nbins]
-print ('cxb_measurement += [%s]'%(cxb_measurement))
+    cxb_measurement_tmp += [(sci_cnt-bkg_cnt)/nbins]
+    qpb_measurement_tmp += [qpb_cnt/nbins]
+print ('cxb_measurement += [%s]'%(cxb_measurement_tmp))
 
 get_cxb_spectrum(spectrum_cxb)
 
-gxb_measurement = []
+gxb_measurement_tmp = []
 for ch in range(0,len(energy_array)-1):
     sci_cnt = spectrum_sci.integral(integral_range=[energy_array[ch],energy_array[ch+1]])
     bkg_cnt = spectrum_det_bkg.integral(integral_range=[energy_array[ch],energy_array[ch+1]])
     cxb_cnt = spectrum_cxb.integral(integral_range=[energy_array[ch],energy_array[ch+1]])
     nbins = (energy_array[ch+1]-energy_array[ch])/ch_scale
-    gxb_measurement += [(sci_cnt-bkg_cnt-cxb_cnt)/nbins]
-print ('gxb_measurement += [%s]'%(gxb_measurement))
+    gxb_measurement_tmp += [(sci_cnt-bkg_cnt-cxb_cnt)/nbins]
+print ('gxb_measurement += [%s]'%(gxb_measurement_tmp))
 
 get_gxb_spectrum(spectrum_gxb)
 
@@ -759,13 +776,9 @@ spectrum_all_bkg.add(spectrum_det_bkg)
 spectrum_all_bkg.add(spectrum_cxb)
 spectrum_all_bkg.add(spectrum_gxb)
 
-cxb_sum = 0.
-gxb_sum = 0.
-qpb_sum = 0.
-for ch in range(0,len(energy_array)-1):
-    cxb_sum += cxb_measurement[ch]
-    gxb_sum += gxb_measurement[ch]
-    qpb_sum += qpb_measurement[ch]
+cxb_sum = spectrum_cxb.integral()
+gxb_sum = spectrum_gxb.integral()
+qpb_sum = spectrum_qpb.integral()
 cxb_2_qpb_ratio = cxb_sum/qpb_sum
 gxb_2_qpb_ratio = gxb_sum/qpb_sum
 image_det_cxb.add(image_det_qpb,factor=cxb_2_qpb_ratio)
