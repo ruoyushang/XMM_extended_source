@@ -5,6 +5,7 @@ echo $SAS_CCF
 echo "SAS_ODF="
 echo $SAS_ODF
 
+echo $PWD
 cd analysis/sky_det_ref/
 
 for (( i=0; i <= 1; ++i ))
@@ -37,18 +38,18 @@ do
     done
 done
 
-esky2det datastyle=user ra=350.82 dec=58.82 outunit=det calinfoset='../mos1-fov-img.fits'
-esky2det datastyle=user ra=350.82 dec=58.82 outunit=det calinfoset='../mos1-fov-img.fits' >"mos1_esky2det_ra_97_dec_97.txt"
-esky2det datastyle=user ra=350.92 dec=58.82 outunit=det calinfoset='../mos1-fov-img.fits'
-esky2det datastyle=user ra=350.92 dec=58.82 outunit=det calinfoset='../mos1-fov-img.fits' >"mos1_esky2det_ra_97_dec_98.txt"
-esky2det datastyle=user ra=350.82 dec=58.92 outunit=det calinfoset='../mos1-fov-img.fits'
-esky2det datastyle=user ra=350.82 dec=58.92 outunit=det calinfoset='../mos1-fov-img.fits' >"mos1_esky2det_ra_98_dec_97.txt"
-
-esky2det datastyle=user ra=350.82 dec=58.82 outunit=det calinfoset='../mos2-fov-img.fits'
-esky2det datastyle=user ra=350.82 dec=58.82 outunit=det calinfoset='../mos2-fov-img.fits' >"mos2_esky2det_ra_97_dec_97.txt"
-esky2det datastyle=user ra=350.92 dec=58.82 outunit=det calinfoset='../mos2-fov-img.fits'
-esky2det datastyle=user ra=350.92 dec=58.82 outunit=det calinfoset='../mos2-fov-img.fits' >"mos2_esky2det_ra_97_dec_98.txt"
-esky2det datastyle=user ra=350.82 dec=58.92 outunit=det calinfoset='../mos2-fov-img.fits'
-esky2det datastyle=user ra=350.82 dec=58.92 outunit=det calinfoset='../mos2-fov-img.fits' >"mos2_esky2det_ra_98_dec_97.txt"
+#esky2det datastyle=user ra=350.82 dec=58.82 outunit=det calinfoset='../mos1-fov-img.fits'
+#esky2det datastyle=user ra=350.82 dec=58.82 outunit=det calinfoset='../mos1-fov-img.fits' >"mos1_esky2det_ra_97_dec_97.txt"
+#esky2det datastyle=user ra=350.92 dec=58.82 outunit=det calinfoset='../mos1-fov-img.fits'
+#esky2det datastyle=user ra=350.92 dec=58.82 outunit=det calinfoset='../mos1-fov-img.fits' >"mos1_esky2det_ra_97_dec_98.txt"
+#esky2det datastyle=user ra=350.82 dec=58.92 outunit=det calinfoset='../mos1-fov-img.fits'
+#esky2det datastyle=user ra=350.82 dec=58.92 outunit=det calinfoset='../mos1-fov-img.fits' >"mos1_esky2det_ra_98_dec_97.txt"
+#
+#esky2det datastyle=user ra=350.82 dec=58.82 outunit=det calinfoset='../mos2-fov-img.fits'
+#esky2det datastyle=user ra=350.82 dec=58.82 outunit=det calinfoset='../mos2-fov-img.fits' >"mos2_esky2det_ra_97_dec_97.txt"
+#esky2det datastyle=user ra=350.92 dec=58.82 outunit=det calinfoset='../mos2-fov-img.fits'
+#esky2det datastyle=user ra=350.92 dec=58.82 outunit=det calinfoset='../mos2-fov-img.fits' >"mos2_esky2det_ra_97_dec_98.txt"
+#esky2det datastyle=user ra=350.82 dec=58.92 outunit=det calinfoset='../mos2-fov-img.fits'
+#esky2det datastyle=user ra=350.82 dec=58.92 outunit=det calinfoset='../mos2-fov-img.fits' >"mos2_esky2det_ra_98_dec_97.txt"
 
 

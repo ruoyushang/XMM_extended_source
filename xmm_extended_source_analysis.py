@@ -74,13 +74,11 @@ on_filter = sys.argv[4]
 #on_filter = 'reg3'
 #on_filter = 'reg4'
 
-energy_array = [2000,4000,6000,8000,10000,12000]
+#energy_array = [2000,4000,6000,8000,10000,12000]
+energy_array = [2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 #ana_ccd_bins = [1]
 ana_ccd_bins = [0]
-
-qpb_calibration = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-#qpb_calibration = [1.0, 1.316644016880023, 1.165767178219302, 1.1071213894776806, 1.076673512002368, 1.0718047208971304]
 
 output_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
 
@@ -439,13 +437,12 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
         my_table.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
         #fits.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), my_table, overwrite=True)
 
-        energy_array_for_area = [2000,4000,6000,8000,10000,12000]
         energy_list = []
         area_list = []
         arf_in_table = Table.read(arf_name, hdu=1)
-        for e in range(0,len(energy_array_for_area)-1):
-            energy_lo = energy_array_for_area[e]
-            energy_hi = energy_array_for_area[e+1]
+        for e in range(0,len(energy_array)-1):
+            energy_lo = energy_array[e]
+            energy_hi = energy_array[e+1]
             entry_cnt = 0.
             avg_area = 0.
             for entry in range(0,len(arf_in_table)):
@@ -594,8 +591,25 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
                 chi = (data_cnt - xray_model - spf_model - qpb_model)*pattern_weight
                 chi_sum += chi
 
-            chi2 += chi_sum
-            #chi2 += chi_sum*chi_sum
+            #chi2 += chi_sum
+            chi2 += chi_sum*chi_sum
+            
+            if energy_range[ch]>=11000:  # almost X-ray free because of low effective area
+                penalty_chi = 0.
+                for pattern in range(0,5):
+                    data_cnt = data_pattern[ch].yaxis[pattern]
+                    qpb_model = qpb_pattern[ch].yaxis[pattern]
+                    spf_model = spf_scale*spf_pattern[ch].yaxis[pattern]
+                    xray_model = xray_scale_sum*xray_pattern[ch].yaxis[pattern]
+                    data_cnt_sum += data_cnt
+                    qpb_model_sum += qpb_model
+                    spf_model_sum += spf_model
+                    xray_model_sum += xray_model
+                    if data_cnt==0: continue
+                    pattern_weight = 1./pow(data_cnt,0.5)
+                    chi = (data_cnt - spf_model - qpb_model)*pattern_weight
+                    penalty_chi += chi
+                chi2 += penalty_chi*penalty_chi
 
             #channel_weight = 1./pow(data_cnt_sum,0.5)
             #penalty_xray = 0.
@@ -630,8 +644,8 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     param_init = np.array(param_init)
     param_bound_upper = np.array(param_bound_upper)
     param_bound_lower = np.array(param_bound_lower)
-    result = least_squares(residuals, x0=param_init, bounds=(param_bound_lower,param_bound_upper))  # x0 is the initial guess for A
-    #result = minimize(residuals, x0=param_init, method='Nelder-Mead')  # x0 is the initial guess for A
+    #result = least_squares(residuals, x0=param_init, bounds=(param_bound_lower,param_bound_upper))  # x0 is the initial guess for A
+    result = minimize(residuals, x0=param_init, method='Nelder-Mead')  # x0 is the initial guess for A
 
     qpb_scale_norm = 1.
 
@@ -1434,11 +1448,10 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         qpb_detx_fov_template += [MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)]
         qpb_image_fov_template += [MyArray2D()]
     for ch in range(0,len(energy_range)):
-        qpb_cali = qpb_calibration[ch]
-        qpb_spectrum_fov_template[ch].add(on_spectrum_fwc_fov[ch],factor=qpb_cali)
-        qpb_detx_fov_template[ch].add(on_detx_fwc_fov[ch],factor=qpb_cali)
-        qpb_image_fov_template[ch].add(on_image_fwc_fov[ch],factor=qpb_cali)
-        ch_norm = on_spectrum_fwc_fov[ch].integral()/on_pattern_fwc_fov[ch].integral()*qpb_cali
+        qpb_spectrum_fov_template[ch].add(on_spectrum_fwc_fov[ch])
+        qpb_detx_fov_template[ch].add(on_detx_fwc_fov[ch])
+        qpb_image_fov_template[ch].add(on_image_fwc_fov[ch])
+        ch_norm = on_spectrum_fwc_fov[ch].integral()/on_pattern_fwc_fov[ch].integral()
         qpb_pattern_fov_template[ch].add(on_pattern_fwc_fov[ch],factor=ch_norm)
 
     for ch in range(0,len(energy_range)):
@@ -1596,49 +1609,49 @@ sp_image_sum = MyArray2D()
 for ccd in range(0,len(ana_ccd_bins)):
     ana_output_spectrum, ana_output_detx, ana_output_image = analyze_a_ccd_chip(energy_range=energy_array,ccd_id=ana_ccd_bins[ccd])
 
-    prob_bkg_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-    prob_bkg_spectrum.add(ana_output_spectrum[1])
-    prob_bkg_spectrum.normalize2()
+    #prob_bkg_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+    #prob_bkg_spectrum.add(ana_output_spectrum[1])
+    #prob_bkg_spectrum.normalize2()
 
-    evt_detx_list = []
-    evt_dety_list = []
-    evt_ra_list = []
-    evt_dec_list = []
-    #evt_l_list = []
-    #evt_b_list = []
-    evt_pi_list = []
-    for idx_x in range(0,len(ana_output_image[1].xaxis)):
-        for idx_y in range(0,len(ana_output_image[1].yaxis)):
-            pix_detx = ana_output_image[1].xaxis[idx_x]
-            pix_dety = ana_output_image[1].yaxis[idx_y]
-            sum_bkg = ana_output_image[1].zaxis[idx_x,idx_y]
-            for evt in range(0,round(sample_scale*sum_bkg)):
-                evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
-                evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
-                #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
-                ref_det_idx = 0
-                if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
-                    ref_det_idx = 1
-                evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
-                #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
-                evt_pi = np.random.choice(a=prob_bkg_spectrum.xaxis, p=prob_bkg_spectrum.yaxis)
-                evt_detx_list += [evt_detx]
-                evt_dety_list += [evt_dety]
-                evt_ra_list += [evt_ra]
-                evt_dec_list += [evt_dec]
-                #evt_l_list += [evt_l]
-                #evt_b_list += [evt_b]
-                evt_pi_list += [evt_pi]
-    col_detx = fits.Column(name='DETX', array=evt_detx_list, format='D')
-    col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
-    col_ra = fits.Column(name='RA', array=evt_ra_list, format='D')
-    col_dec = fits.Column(name='DEC', array=evt_dec_list, format='D')
-    #col_l = fits.Column(name='GalL', array=evt_l_list, format='D')
-    #col_b = fits.Column(name='GalB', array=evt_b_list, format='D')
-    col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
-    #my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_l,col_b,col_pi],name='EVENT')
-    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
-    my_table.writeto('%s/bkg_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
+    #evt_detx_list = []
+    #evt_dety_list = []
+    #evt_ra_list = []
+    #evt_dec_list = []
+    ##evt_l_list = []
+    ##evt_b_list = []
+    #evt_pi_list = []
+    #for idx_x in range(0,len(ana_output_image[1].xaxis)):
+    #    for idx_y in range(0,len(ana_output_image[1].yaxis)):
+    #        pix_detx = ana_output_image[1].xaxis[idx_x]
+    #        pix_dety = ana_output_image[1].yaxis[idx_y]
+    #        sum_bkg = ana_output_image[1].zaxis[idx_x,idx_y]
+    #        for evt in range(0,round(sample_scale*sum_bkg)):
+    #            evt_detx = np.random.uniform(low=pix_detx, high=pix_detx+detx_scale)
+    #            evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
+    #            #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
+    #            ref_det_idx = 0
+    #            if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
+    #                ref_det_idx = 1
+    #            evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
+    #            #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
+    #            evt_pi = np.random.choice(a=prob_bkg_spectrum.xaxis, p=prob_bkg_spectrum.yaxis)
+    #            evt_detx_list += [evt_detx]
+    #            evt_dety_list += [evt_dety]
+    #            evt_ra_list += [evt_ra]
+    #            evt_dec_list += [evt_dec]
+    #            #evt_l_list += [evt_l]
+    #            #evt_b_list += [evt_b]
+    #            evt_pi_list += [evt_pi]
+    #col_detx = fits.Column(name='DETX', array=evt_detx_list, format='D')
+    #col_dety = fits.Column(name='DETY', array=evt_dety_list, format='D')
+    #col_ra = fits.Column(name='RA', array=evt_ra_list, format='D')
+    #col_dec = fits.Column(name='DEC', array=evt_dec_list, format='D')
+    ##col_l = fits.Column(name='GalL', array=evt_l_list, format='D')
+    ##col_b = fits.Column(name='GalB', array=evt_b_list, format='D')
+    #col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
+    ##my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_l,col_b,col_pi],name='EVENT')
+    #my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
+    #my_table.writeto('%s/bkg_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     prob_spf_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     prob_spf_spectrum.add(ana_output_spectrum[2])

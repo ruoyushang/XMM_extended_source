@@ -14,42 +14,21 @@ from matplotlib import colors
 
 import common_functions
 
-#on_sample = 'extragalactic'
-#on_obsID = 'ID0690900101' # 90% SPF
-#on_obsID = 'ID0827241101' # 51% SPF
-#on_obsID = 'ID0505460501' # 27% SPF
-#on_obsID = 'ID0804860301' # 25% SPF
-#on_obsID = 'ID0803160301' # 10% SPF
-#on_obsID = 'ID0820560101' # 0% SPF
-#on_obsID = 'ID0827200401' # 4% SPF
-#on_obsID = 'ID0827200501' # 0% SPF
-#on_obsID = 'ID0827251001' # 0% SPF
-#on_obsID = 'ID0827251101' # 0% SPF
+on_sample = sys.argv[1]
+on_obsID = sys.argv[2]
 
 #on_sample = 'Cas_A'
 #on_obsID = 'ID0412180101'
 #on_obsID = 'ID0400210101' # Cas A Northern lobe
 #on_obsID = 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
 
-on_sample = '3HWC_J1928_p178'
-#on_obsID = 'ID0902120101'
-#on_obsID = 'ID0503740101'
-#on_obsID = 'ID0830192001'
-#on_obsID = 'ID0406730101'
-#on_obsID = 'ID0762980101'
-#on_obsID = 'ID0742710301'
-on_obsID = 'ID0822330301'
-#on_obsID = 'ID0861880101' # 57% SPF
-#on_obsID = 'ID0841190101' # bright source
-#on_obsID = 'ID0851181701' # bright source
-#on_obsID = 'ID0724270101' # SNR with escaped CRs?
-#on_obsID = 'ID0724270201' # bright SNR
-#on_obsID = 'ID0742710401' # broken chip
-#on_obsID = 'ID0763240101' # strange ring patterns
-#on_obsID = 'ID0822330201' # strange ring patterns
-
 #detector = 'mos1'
 detector = 'mos2'
+
+#use_cxb = False
+use_cxb = True
+#use_gxb = False
+use_gxb = True
 
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
@@ -60,15 +39,25 @@ exclusion_inner = 0.
 #exclusion_outer = 0.15
 exclusion_outer = 1e10
 
-point_source_cut = True
-#point_source_cut = False
+# background study
+find_extended_src = True
+find_point_src = True
+select_mask_events = False
+
+# select events in RoI
+#find_extended_src = True
+#find_point_src = False
+#select_mask_events = True
+
+show_log_map = False
 
 do_fit = False
 
 energy_cut_lower = 2000
 energy_cut_upper = 12000
 
-energy_array = [2000,4000,6000,8000,10000,12000]
+#energy_array = [2000,4000,6000,8000,10000,12000]
+energy_array = [2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 
 roi_ra = 350.85
 roi_dec = 58.815
@@ -115,14 +104,16 @@ map_color = 'coolwarm'
 def get_cxb_spectrum(hist_cxb):
 
     cxb_measurement = []
-    cxb_measurement += [[1.2460764078351871, 0.2595672221132602, -0.06124044036042946, 0.010761918389746227, -0.21767261123909448]]
-    cxb_measurement += [[1.5110231403649634, 0.2640095032122119, -0.3466999797149171, -0.4525475397740095, -0.5749894471585769]]
-    cxb_measurement += [[1.5431756741827456, 0.6109999767024142, 0.1452067845868072, 0.22299613347240382, -0.0185044360227856]]
-    cxb_measurement += [[1.873602737378438, 0.9950159236561099, 0.6393535129073321, 0.6287842997576867, 0.31489544574308825]]
-    cxb_measurement += [[1.0822887673414292, 0.41326724730222963, 0.19304157013872897, 0.12473719995592134, 0.10555347885917783]]
-    cxb_measurement += [[0.8917712578452764, 0.48677549677590903, 0.1328807248329376, -0.15747818141105654, -0.051373285693748015]]
-    cxb_measurement += [[1.1162834709255116, 0.4128565130768429, 0.2193164617501438, 0.04738693633387427, -0.013712703188156183]]
-    cxb_measurement += [[1.3413456972931797, 0.4922646398350615, 0.13633582524099525, 0.045889076594834675, -0.06825667292332441]]
+    cxb_measurement += [[0.85,0.43,0.30,0.17,0.07,0.03,0.06,-0.03,-0.00,0.11]] #ID0827241101, 0.00 SPF 
+    cxb_measurement += [[0.93,0.50,0.26,0.00,0.07,-0.02,0.17,-0.07,-0.15,-0.07]] #ID0505460501, 0.27 SPF 
+    cxb_measurement += [[0.98,0.67,0.33,0.27,0.09,-0.06,0.01,-0.04,-0.20,-0.04]] #ID0804860301, 0.21 SPF 
+    cxb_measurement += [[1.01,0.64,0.39,0.20,0.11,0.02,0.06,-0.01,-0.06,0.00]] #ID0690900101, 0.22 SPF 
+    cxb_measurement += [[0.39,0.38,0.15,0.11,0.04,-0.14,-0.00,0.08,-0.13,-0.07]] #ID0803160301, 0.11 SPF 
+    cxb_measurement += [[0.40,0.30,0.08,0.06,0.07,0.06,0.18,0.02,-0.03,0.02]] #ID0820560101, 0.13 SPF 
+    cxb_measurement += [[0.44,0.14,0.07,0.06,-0.01,-0.14,0.00,-0.04,-0.11,0.08]] #ID0827200401, 0.09 SPF 
+    cxb_measurement += [[0.64,0.30,0.28,0.24,0.05,0.07,-0.03,-0.18,-0.06,0.04]] #ID0827200501, 0.00 SPF 
+    cxb_measurement += [[0.27,0.10,-0.02,-0.10,-0.02,-0.15,-0.12,-0.16,-0.09,-0.17]] #ID0827251001, 0.08 SPF 
+    cxb_measurement += [[0.51,0.27,0.05,0.03,-0.03,-0.12,-0.02,-0.13,-0.05,-0.20]] #ID0827251101, 0.06 SPF 
 
     hist_cxb_measurement = MyArray1D(bin_start=energy_array[0],bin_end=energy_array[len(energy_array)-1],pixel_scale=energy_array[1]-energy_array[0])
     for ch in range(0,len(energy_array)-1):
@@ -145,12 +136,13 @@ def get_cxb_spectrum(hist_cxb):
 def get_gxb_spectrum(hist_gxb):
 
     gxb_measurement = []
-    gxb_measurement += [[1.3516506948299853, 0.5873110283798142, 0.20035191142546557, 0.09132174038363583, 0.14828325188954022]]
-    gxb_measurement += [[2.096893323374876, 0.6825092676677877, 0.20085330998619902, -0.12528111058407812, -0.25872850490039534]]
-    gxb_measurement += [[1.721944994819511, 0.6134754511413101, 0.10109597873251537, -0.01706314759658094, -0.15607266246362891]]
-    gxb_measurement += [[1.764603682517303, 0.5002385196933191, -0.033018911413896256, -0.23136404597757654, -0.17491760224497677]]
-    gxb_measurement += [[1.7929416062600456, 0.8932197038025826, 0.30368136538555723, 0.1469531272816006, -0.01657585506453758]]
-    gxb_measurement += [[2.0574467391937805, 1.2317014735485052, 0.6749214331887166, 0.2727590099893934, 0.14625001792403572]]
+    gxb_measurement += [[0.57,0.27,0.02,0.10,-0.14,-0.09,-0.23,-0.16,-0.06,-0.08]] #ID0503740101, 0.25 SPF 
+    gxb_measurement += [[1.36,0.90,0.56,0.32,0.27,0.14,-0.03,0.00,0.00,0.05]] #ID0830192001, 0.08 SPF 
+    gxb_measurement += [[1.13,0.62,0.35,0.22,0.07,-0.03,-0.09,0.01,-0.02,-0.04]] #ID0406730101, 0.05 SPF 
+    gxb_measurement += [[1.04,0.65,0.44,0.16,-0.01,-0.00,-0.13,-0.06,0.04,0.05]] #ID0762980101, 0.19 SPF 
+    gxb_measurement += [[1.03,0.80,0.53,0.30,0.17,0.14,0.03,0.07,0.12,0.06]] #ID0742710301, 0.09 SPF 
+    gxb_measurement += [[1.07,0.73,0.51,0.54,0.41,0.16,0.07,0.06,0.04,0.15]] #ID0822330301, 0.10 SPF 
+    gxb_measurement += [[0.82,0.47,0.31,0.15,-0.16,0.00,-0.10,0.03,-0.03,-0.08]] #ID0861880101, 0.26 SPF 
 
     hist_gxb_measurement = MyArray1D(bin_start=energy_array[0],bin_end=energy_array[len(energy_array)-1],pixel_scale=energy_array[1]-energy_array[0])
     for ch in range(0,len(energy_array)-1):
@@ -553,15 +545,16 @@ axbig.imshow(image_det_diff_lofreq.zaxis[:,:],origin='lower',cmap=map_color,exte
 fig.savefig("%s/%s_%s_image_det_diff_lofreq.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
-hist_gravity = find_point_sources_with_gravity(image_det_diff_lofreq,image_det_mask)
-fig.clf()
-axbig = fig.add_subplot()
-axbig.plot(hist_gravity.xaxis,hist_gravity.yaxis)
-axbig.set_yscale('log')
-axbig.set_xlabel('Gravity')
-axbig.legend(loc='best')
-fig.savefig("%s/%s_%s_gravity_lofreq.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
-axbig.remove()
+if find_extended_src:
+    hist_gravity = find_point_sources_with_gravity(image_det_diff_lofreq,image_det_mask)
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.plot(hist_gravity.xaxis,hist_gravity.yaxis)
+    axbig.set_yscale('log')
+    axbig.set_xlabel('Gravity')
+    axbig.legend(loc='best')
+    fig.savefig("%s/%s_%s_gravity_lofreq.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+    axbig.remove()
 
 fft_filter(image_det_mask,image_det_diff,image_det_diff_hifreq,fft_lofreq_mode,0)
 fig.clf()
@@ -578,15 +571,16 @@ axbig.imshow(image_det_diff_hifreq.zaxis[:,:],origin='lower',cmap=map_color,exte
 fig.savefig("%s/%s_%s_image_det_diff_hifreq.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
-hist_gravity = find_point_sources_with_gravity(image_det_diff_hifreq,image_det_mask)
-fig.clf()
-axbig = fig.add_subplot()
-axbig.plot(hist_gravity.xaxis,hist_gravity.yaxis)
-axbig.set_yscale('log')
-axbig.set_xlabel('Gravity')
-axbig.legend(loc='best')
-fig.savefig("%s/%s_%s_gravity_hifreq.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
-axbig.remove()
+if find_point_src:
+    hist_gravity = find_point_sources_with_gravity(image_det_diff_hifreq,image_det_mask)
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.plot(hist_gravity.xaxis,hist_gravity.yaxis)
+    axbig.set_yscale('log')
+    axbig.set_xlabel('Gravity')
+    axbig.legend(loc='best')
+    fig.savefig("%s/%s_%s_gravity_hifreq.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
+    axbig.remove()
 
 fig.clf()
 axbig = fig.add_subplot()
@@ -660,7 +654,10 @@ for ccd in range(0,len(ana_ccd_bins)):
             evt_cnt = image_det_sci.zaxis[idx_x,idx_y]
             mask = image_det_mask.zaxis[idx_x,idx_y]
             if evt_cnt==0.: continue
-            if mask==1: continue
+            if not select_mask_events:
+                if mask==1: continue
+            else:
+                if mask!=1: continue
             fov_size += pow(map_rebin*detx_scale*0.05/(60.*60.),2)/3282.8 # steradian
 
     sci_table = Table.read(sci_filename, hdu=1)
@@ -674,9 +671,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
         if evt_pi<energy_cut_lower: continue
         if evt_pi>energy_cut_upper: continue
-        if point_source_cut:
-            mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        if not select_mask_events:
             if mask==1: continue
+        else:
+            if mask!=1: continue
         areatime = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
         spectrum_sci.fill(evt_pi,weight=1./areatime)
         image_det_xry.fill(evt_detx,evt_dety,weight=1./areatime)
@@ -697,9 +696,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
         if evt_pi<energy_cut_lower: continue
         if evt_pi>energy_cut_upper: continue
-        if point_source_cut:
-            mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        if not select_mask_events:
             if mask==1: continue
+        else:
+            if mask!=1: continue
         areatime = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
         spectrum_qpb.fill(evt_pi,weight=1./areatime*1./sample_scale)
         spectrum_det_bkg.fill(evt_pi,weight=1./areatime*1./sample_scale)
@@ -722,9 +723,11 @@ for ccd in range(0,len(ana_ccd_bins)):
         if distance_2_roi<exclusion_inner or distance_2_roi>exclusion_outer: continue
         if evt_pi<energy_cut_lower: continue
         if evt_pi>energy_cut_upper: continue
-        if point_source_cut:
-            mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
+        if not select_mask_events:
             if mask==1: continue
+        else:
+            if mask!=1: continue
         areatime = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
         spectrum_spf.fill(evt_pi,weight=1./areatime*1./sample_scale)
         spectrum_det_bkg.fill(evt_pi,weight=1./areatime*1./sample_scale)
@@ -746,6 +749,7 @@ print ('sci_bkg_ratio = %s'%(sci_bkg_ratio))
 
 bkg_cnt = spectrum_det_bkg.integral()
 spf_cnt = spectrum_spf.integral()
+spf_frac = spf_cnt/bkg_cnt
 print (f'spf_cnt/bkg_cnt = {spf_cnt/bkg_cnt}')
 
 cxb_measurement_tmp = []
@@ -757,9 +761,19 @@ for ch in range(0,len(energy_array)-1):
     nbins = (energy_array[ch+1]-energy_array[ch])/ch_scale
     cxb_measurement_tmp += [(sci_cnt-bkg_cnt)/nbins]
     qpb_measurement_tmp += [qpb_cnt/nbins]
-print ('cxb_measurement += [%s]'%(cxb_measurement_tmp))
 
-get_cxb_spectrum(spectrum_cxb)
+if not use_cxb:
+    cxb_file = open("%s/cxb.txt"%(output_dir),"a")
+    cxb_file.write('cxb_measurement += [[')
+    for entry in range(0,len(cxb_measurement_tmp)):
+        cxb_file.write('%0.2f'%(cxb_measurement_tmp[entry]))
+        if entry!=len(cxb_measurement_tmp)-1:
+            cxb_file.write(',')
+        else:
+            cxb_file.write(']] #%s, %0.2f SPF \n'%(on_obsID,spf_frac))
+    cxb_file.close()
+else:
+    get_cxb_spectrum(spectrum_cxb)
 
 gxb_measurement_tmp = []
 for ch in range(0,len(energy_array)-1):
@@ -768,9 +782,19 @@ for ch in range(0,len(energy_array)-1):
     cxb_cnt = spectrum_cxb.integral(integral_range=[energy_array[ch],energy_array[ch+1]])
     nbins = (energy_array[ch+1]-energy_array[ch])/ch_scale
     gxb_measurement_tmp += [(sci_cnt-bkg_cnt-cxb_cnt)/nbins]
-print ('gxb_measurement += [%s]'%(gxb_measurement_tmp))
 
-get_gxb_spectrum(spectrum_gxb)
+if not use_gxb:
+    gxb_file = open("%s/gxb.txt"%(output_dir),"a")
+    gxb_file.write('gxb_measurement += [[')
+    for entry in range(0,len(gxb_measurement_tmp)):
+        gxb_file.write('%0.2f'%(gxb_measurement_tmp[entry]))
+        if entry!=len(gxb_measurement_tmp)-1:
+            gxb_file.write(',')
+        else:
+            gxb_file.write(']] #%s, %0.2f SPF \n'%(on_obsID,spf_frac))
+    gxb_file.close()
+else:
+    get_gxb_spectrum(spectrum_gxb)
 
 spectrum_all_bkg.add(spectrum_det_bkg)
 spectrum_all_bkg.add(spectrum_cxb)
@@ -817,10 +841,11 @@ xmin = image_det_sci_fine.xaxis.min()
 xmax = image_det_sci_fine.xaxis.max()
 ymin = image_det_sci_fine.yaxis.min()
 ymax = image_det_sci_fine.yaxis.max()
-#im = axbig.imshow(image_det_sci_fine.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax), norm=colors.LogNorm())
-im = axbig.imshow(image_det_sci_fine.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-#cbar = fig.colorbar(im)
-#cbar.set_label('Count')
+if show_log_map:
+    axbig.imshow(image_det_sci_fine.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax), norm=colors.LogNorm())
+else:
+    axbig.imshow(image_det_sci_fine.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+axbig.contour(image_det_mask.zaxis[:,:], np.arange(0.0, 1.5, 1.0), linestyles='solid', colors='red', extent=(xmin,xmax,ymin,ymax))
 fig.savefig("%s/%s_%s_image_det_sci.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
@@ -882,51 +907,83 @@ axbig.imshow(image_det_spf.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin
 fig.savefig("%s/%s_%s_image_det_spf.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(spectrum_sci.xaxis,spectrum_sci.yaxis,yerr=spectrum_sci.yerr,color='k',label='Data')
-axbig.plot(spectrum_qpb.xaxis,spectrum_qpb.yaxis,color='purple',label='QPB')
-axbig.plot(spectrum_spf.xaxis,spectrum_spf.yaxis,color='blue',label='SPF')
-axbig.plot(spectrum_cxb.xaxis,spectrum_cxb.yaxis,color='green',label='CXB')
-axbig.plot(spectrum_gxb.xaxis,spectrum_gxb.yaxis,color='orange',label='GDE')
-axbig.plot(spectrum_all_bkg.xaxis,spectrum_all_bkg.yaxis,color='red',label='Bkg')
-#axbig.set_yscale('log')
-#axbig.set_ylim(bottom=1)
-axbig.set_xlabel('Energy [eV]')
-axbig.set_ylabel('Photons /cm2/s/sr/keV')
-axbig.legend(loc='best')
-fig.savefig("%s/%s_%s_spectrum_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
-axbig.remove()
+def draw_stacked_hisstogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,ylabel,plot_name):
 
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(detx_sci.xaxis,detx_sci.yaxis,yerr=detx_sci.yerr,color='k',label='Data')
-axbig.plot(detx_qpb.xaxis,detx_qpb.yaxis,color='purple',label='QPB')
-axbig.plot(detx_spf.xaxis,detx_spf.yaxis,color='blue',label='SPF')
-axbig.plot(detx_cxb.xaxis,detx_cxb.yaxis,color='green',label='CXB')
-axbig.plot(detx_gxb.xaxis,detx_gxb.yaxis,color='orange',label='GDE')
-axbig.plot(detx_bkg.xaxis,detx_bkg.yaxis,color='red',label='Bkg')
-#axbig.set_yscale('log')
-#axbig.set_ylim(bottom=1)
-axbig.set_xlabel('DETX')
-axbig.legend(loc='best')
-fig.savefig("%s/%s_%s_detx_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
-axbig.remove()
+    n_bins = len(hist_data.xaxis)
+    stack_bkg = []
+    for h1 in range(0,len(hist_bkg)):
+        stack_bkg += [MyArray1D(bin_start=hist_data.xaxis[0],bin_end=hist_data.xaxis[n_bins-1],pixel_scale=hist_data.xaxis[1]-hist_data.xaxis[0])]
+        for h2 in range(h1,len(hist_bkg)):
+            stack_bkg[h1].add(hist_bkg[h2])
 
-fig.clf()
-axbig = fig.add_subplot()
-axbig.errorbar(dety_sci.xaxis,dety_sci.yaxis,yerr=dety_sci.yerr,color='k',label='Data')
-axbig.plot(dety_qpb.xaxis,dety_qpb.yaxis,color='purple',label='QPB')
-axbig.plot(dety_spf.xaxis,dety_spf.yaxis,color='blue',label='SPF')
-axbig.plot(dety_cxb.xaxis,dety_cxb.yaxis,color='green',label='CXB')
-axbig.plot(dety_gxb.xaxis,dety_gxb.yaxis,color='orange',label='GDE')
-axbig.plot(dety_bkg.xaxis,dety_bkg.yaxis,color='red',label='Bkg')
-#axbig.set_yscale('log')
-#axbig.set_ylim(bottom=1)
-axbig.set_xlabel('DETY')
-axbig.legend(loc='best')
-fig.savefig("%s/%s_%s_dety_model.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
-axbig.remove()
+    fig.clf()
+    axbig = fig.add_subplot()
+    for h in range(0,len(hist_bkg)):
+        axbig.fill_between(stack_bkg[h].xaxis,0.,stack_bkg[h].yaxis,color=bkg_colors[h],label=bkg_labels[h])
+    axbig.errorbar(hist_data.xaxis,hist_data.yaxis,yerr=hist_data.yerr,color='k',label='Data')
+    #axbig.set_yscale('log')
+    #axbig.set_ylim(bottom=1)
+    axbig.set_xlabel(xlabel)
+    axbig.set_ylabel(ylabel)
+    axbig.legend(loc='best')
+    fig.savefig("%s/%s_%s_%s.png"%(output_dir,on_obsID,detector,plot_name),bbox_inches='tight')
+    axbig.remove()
+
+color_list = ['salmon','orange','yellowgreen','deepskyblue']
+
+plot_data = spectrum_sci
+plot_bkg = []
+plot_color = []
+plot_label = []
+plot_bkg += [spectrum_gxb]
+plot_color += [color_list[3]]
+plot_label += ['GDX']
+plot_bkg += [spectrum_cxb]
+plot_color += [color_list[2]]
+plot_label += ['CXB']
+plot_bkg += [spectrum_spf]
+plot_color += [color_list[1]]
+plot_label += ['SPF']
+plot_bkg += [spectrum_qpb]
+plot_color += [color_list[0]]
+plot_label += ['QPB']
+draw_stacked_hisstogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV','spectrum')
+
+plot_data = detx_sci
+plot_bkg = []
+plot_color = []
+plot_label = []
+plot_bkg += [detx_gxb]
+plot_color += [color_list[3]]
+plot_label += ['GDX']
+plot_bkg += [detx_cxb]
+plot_color += [color_list[2]]
+plot_label += ['CXB']
+plot_bkg += [detx_spf]
+plot_color += [color_list[1]]
+plot_label += ['SPF']
+plot_bkg += [detx_qpb]
+plot_color += [color_list[0]]
+plot_label += ['QPB']
+draw_stacked_hisstogram(fig,plot_data,plot_bkg,plot_color,plot_label,'DETX','Photons /cm2/s/sr/keV','detx')
+
+plot_data = dety_sci
+plot_bkg = []
+plot_color = []
+plot_label = []
+plot_bkg += [dety_gxb]
+plot_color += [color_list[3]]
+plot_label += ['GDX']
+plot_bkg += [dety_cxb]
+plot_color += [color_list[2]]
+plot_label += ['CXB']
+plot_bkg += [dety_spf]
+plot_color += [color_list[1]]
+plot_label += ['SPF']
+plot_bkg += [dety_qpb]
+plot_color += [color_list[0]]
+plot_label += ['QPB']
+draw_stacked_hisstogram(fig,plot_data,plot_bkg,plot_color,plot_label,'DETY','Photons /cm2/s/sr/keV','dety')
 
 
 MakeGalacticProjection(image_galactic_xry, galx_xry, galy_xry)

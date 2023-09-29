@@ -19,29 +19,70 @@
 #python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0412180101'
 #python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0400210101' # Cas A Northern lobe
 #python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
-#python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0764640101' # angular distance to Cas A: 144.51 arcmin
+#python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0764640101' # angular distance to Cas A: 144.51 arcmin, broken
 #
 #python3 xmm_extended_source_analysis.py 'PSR_J1856_p0245' 'ID0302970201'
 
 
 #source_name='extragalactic'
-#ID_array=('ID0803160301')
-#ID_array=('ID0505460501' 'ID0690900101' 'ID0803160301' 'ID0820560101' 'ID0827200401' 'ID0827200501' 'ID0827241101' 'ID0827251001' 'ID0827251101' 'ID0804860301')
-#
-#source_name='Cas_A'
-#ID_array=('ID0137550301' 'ID0412180101' 'ID0400210101' 'ID0782961401' 'ID0764640101') # ON, Cas A Northern lobe, angular distance to Cas A: 34.7 arcmin, 144.51 arcmin
+#ID_array=()
+#ID_array+=('ID0827241101') # 51% SPF
+#ID_array+=('ID0505460501') # 27% SPF
+#ID_array+=('ID0804860301') # 25% SPF
+#ID_array+=('ID0690900101') # 21% SPF
+#ID_array+=('ID0803160301') # 10% SPF
+#ID_array+=('ID0820560101') # 0% SPF
+#ID_array+=('ID0827200401') # 4% SPF
+#ID_array+=('ID0827200501') # 0% SPF
+#ID_array+=('ID0827251001') # 0% SPF
+#ID_array+=('ID0827251101') # 0% SPF
 
-source_name='3HWC_J1928_p178'
-#ID_array=('ID0724270101' 'ID0724270201' 'ID0742710301' 'ID0742710401' 'ID0763240101' 'ID0822330201' 'ID0822330301')
-ID_array=('ID0902120101' 'ID0503740101' 'ID0830192001' 'ID0841190101' 'ID0861880101' 'ID0406730101' 'ID0762980101' 'ID0851181701' 'ID0724270101' 'ID0724270201' 'ID0742710301' 'ID0742710401' 'ID0763240101' 'ID0822330201' 'ID0822330301')
+
+#source_name='Cas_A'
+#ID_array=()
+#ID_array+=('ID0137550301') # no MOS2
+#ID_array+=('ID0400210101') # Cas A Northern lobe
+#ID_array+=('ID0412180101') # Cas A
+#ID_array+=('ID0782961401') # 34.7 arcmin away
+#ID_array+=('ID0764640101') # 144.51 arcmin away, broken
+
+#source_name='3HWC_J1928_p178'
+#ID_array=()
+#ID_array+=('ID0902120101')
+#ID_array+=('ID0503740101')
+#ID_array+=('ID0830192001')
+#ID_array+=('ID0406730101')
+#ID_array+=('ID0762980101')
+#ID_array+=('ID0742710301')
+#ID_array+=('ID0822330301')
+#ID_array+=('ID0861880101') # 57% SPF
+#ID_array+=('ID0841190101') # bright source
+#ID_array+=('ID0851181701') # bright source
+#ID_array+=('ID0724270101') # SNR with escaped CRs?
+#ID_array+=('ID0724270201') # bright SNR
+#ID_array+=('ID0742710401') # broken chip
+#ID_array+=('ID0763240101') # strange ring patterns
+#ID_array+=('ID0822330201') # strange ring patterns
 
 #source_name='IC_443'
 #ID_array=('ID0301960101')
 
+source_name='skycoord_l0_b25'
+ID_array=()
+ID_array+=('0083000101')
+ID_array+=('0672660401')
+ID_array+=('0844050101')
+ID_array+=('0112880101')
+ID_array+=('0556200301')
+ID_array+=('0110930101')
+ID_array+=('0691320601')
+ID_array+=('0202940201')
+ID_array+=('0822470101')
+
 
 for i in ${ID_array[@]}
 do
-    obs_ID=$i
+    obs_ID='ID'$i
     rm -r /Users/rshang/xmm_analysis/output_plots/$source_name/$obs_ID
     mkdir /Users/rshang/xmm_analysis/output_plots/$source_name
     mkdir /Users/rshang/xmm_analysis/output_plots/$source_name/$obs_ID

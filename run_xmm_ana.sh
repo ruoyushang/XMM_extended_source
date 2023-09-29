@@ -40,26 +40,45 @@
 #cd /Users/rshang/xmm_analysis/3HWC_J1928_p178/ID0742710401
 #cd /Users/rshang/xmm_analysis/3HWC_J1928_p178/ID0763240101
 #cd /Users/rshang/xmm_analysis/3HWC_J1928_p178/ID0822330201
-cd /Users/rshang/xmm_analysis/3HWC_J1928_p178/ID0822330301
+#cd /Users/rshang/xmm_analysis/3HWC_J1928_p178/ID0822330301
 
-cp /Users/rshang/xmm_analysis/analysis_code/*.sh .
-cp /Users/rshang/xmm_analysis/analysis_code/*.py .
+source_name='skycoord_l0_b25'
+obs_ID_list=()
+obs_ID_list+=('0083000101')
+obs_ID_list+=('0672660401')
+obs_ID_list+=('0844050101')
+obs_ID_list+=('0112880101')
+obs_ID_list+=('0556200301')
+obs_ID_list+=('0110930101')
+obs_ID_list+=('0691320601')
+obs_ID_list+=('0202940201')
+obs_ID_list+=('0822470101')
+
+for i in ${obs_ID_list[@]}
+do
+    obs_ID=$i
+    obs_folder='ID'$obs_ID
+    echo $obs_folder
+
+    cd /Users/rshang/xmm_analysis/$source_name/$obs_folder
+    cp /Users/rshang/xmm_analysis/analysis_code/*.sh .
+    cp /Users/rshang/xmm_analysis/analysis_code/*.py .
+
+    #sh extract_data.sh
+    #sh run_cifbuild.sh
+    #sh clean.sh 
+    #sh run_ana_chains.sh
+    
+    #sh run_rename.sh
+    
+    #sh run_filtering.sh
+    #sh run_skyref.sh
+    #sh run_esky2det.sh
+    #sh run_response.sh
+
+done
 
 
-
-
-
-#sh extract_data.sh
-#sh run_cifbuild.sh
-#sh clean.sh 
-#sh run_ana_chains.sh
-
-#sh run_rename.sh
-
-#sh run_filtering.sh
-#sh run_skyref.sh
-#sh run_esky2det.sh
-sh run_response.sh
 
 
 
@@ -70,8 +89,6 @@ sh run_response.sh
 
 
 #sh run_regions.sh
-
-
 
 #python3 run_pointing_radec.py
 #sh run_create_regions.sh
