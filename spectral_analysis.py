@@ -25,10 +25,10 @@ on_obsID = sys.argv[2]
 #detector = 'mos1'
 detector = 'mos2'
 
-#use_cxb = False
-use_cxb = True
-#use_gxb = False
-use_gxb = True
+use_cxb = False
+#use_cxb = True
+use_gxb = False
+#use_gxb = True
 
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
@@ -50,14 +50,15 @@ select_mask_events = False
 #select_mask_events = True
 
 show_log_map = False
+show_log_spectrum = True
 
 do_fit = False
 
-energy_cut_lower = 2000
+energy_cut_lower = 200
 energy_cut_upper = 12000
 
 #energy_array = [2000,4000,6000,8000,10000,12000]
-energy_array = [2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
+energy_array = [0,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 
 roi_ra = 350.85
 roi_dec = 58.815
@@ -337,7 +338,7 @@ sky_ra_center = 0.
 sky_dec_center = 0.
 
 input_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
-output_dir = '/Users/rshang/xmm_analysis/output_plots/'
+output_dir = '/Users/rshang/xmm_analysis/output_plots/plots/'
 
 image_det_sci_fine = MyArray2D()
 image_det_mask = MyArray2D(pixel_scale=map_rebin*detx_scale)
@@ -763,7 +764,7 @@ for ch in range(0,len(energy_array)-1):
     qpb_measurement_tmp += [qpb_cnt/nbins]
 
 if not use_cxb:
-    cxb_file = open("%s/cxb.txt"%(output_dir),"a")
+    cxb_file = open("%s/cxb_%s.txt"%(output_dir,on_sample),"a")
     cxb_file.write('cxb_measurement += [[')
     for entry in range(0,len(cxb_measurement_tmp)):
         cxb_file.write('%0.2f'%(cxb_measurement_tmp[entry]))
@@ -784,7 +785,7 @@ for ch in range(0,len(energy_array)-1):
     gxb_measurement_tmp += [(sci_cnt-bkg_cnt-cxb_cnt)/nbins]
 
 if not use_gxb:
-    gxb_file = open("%s/gxb.txt"%(output_dir),"a")
+    gxb_file = open("%s/gxb_%s.txt"%(output_dir,on_sample),"a")
     gxb_file.write('gxb_measurement += [[')
     for entry in range(0,len(gxb_measurement_tmp)):
         gxb_file.write('%0.2f'%(gxb_measurement_tmp[entry]))
@@ -907,7 +908,7 @@ axbig.imshow(image_det_spf.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin
 fig.savefig("%s/%s_%s_image_det_spf.png"%(output_dir,on_obsID,detector),bbox_inches='tight')
 axbig.remove()
 
-def draw_stacked_hisstogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,ylabel,plot_name):
+def draw_stacked_hisstogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,ylabel,plot_name,log_scale=False):
 
     n_bins = len(hist_data.xaxis)
     stack_bkg = []
@@ -921,8 +922,9 @@ def draw_stacked_hisstogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,
     for h in range(0,len(hist_bkg)):
         axbig.fill_between(stack_bkg[h].xaxis,0.,stack_bkg[h].yaxis,color=bkg_colors[h],label=bkg_labels[h])
     axbig.errorbar(hist_data.xaxis,hist_data.yaxis,yerr=hist_data.yerr,color='k',label='Data')
-    #axbig.set_yscale('log')
-    #axbig.set_ylim(bottom=1)
+    if log_scale:
+        axbig.set_yscale('log')
+        #axbig.set_ylim(bottom=1)
     axbig.set_xlabel(xlabel)
     axbig.set_ylabel(ylabel)
     axbig.legend(loc='best')
@@ -947,7 +949,7 @@ plot_label += ['SPF']
 plot_bkg += [spectrum_qpb]
 plot_color += [color_list[0]]
 plot_label += ['QPB']
-draw_stacked_hisstogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV','spectrum')
+draw_stacked_hisstogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV','spectrum',show_log_spectrum)
 
 plot_data = detx_sci
 plot_bkg = []
@@ -1083,7 +1085,7 @@ if do_fit:
     axbig.set_ylim(bottom=1)
     axbig.set_xlabel('Energy [eV]')
     axbig.legend(loc='best')
-    fig.savefig("../output_plots/fit_model.png",bbox_inches='tight')
+    fig.savefig("%s/fit_model.png"%(output_dir),bbox_inches='tight')
     axbig.remove()
 
 print ('I am done.')

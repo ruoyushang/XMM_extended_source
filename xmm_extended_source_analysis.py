@@ -75,7 +75,7 @@ on_filter = sys.argv[4]
 #on_filter = 'reg4'
 
 #energy_array = [2000,4000,6000,8000,10000,12000]
-energy_array = [2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
+energy_array = [0,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 #ana_ccd_bins = [1]
 ana_ccd_bins = [0]
@@ -570,10 +570,6 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
                 spf_model_sum += spf_model
                 xray_raw_sum += xray_raw
             xray_scale_sum = (data_cnt_sum-qpb_model_sum-spf_model_sum)/xray_raw_sum
-            data_cnt_sum = 0.
-            qpb_model_sum = 0.
-            spf_model_sum = 0.
-            xray_model_sum = 0.
             chi_sum = 0.
             for pattern in range(0,5):
                 if pattern!=2 and pattern!=4: continue
@@ -581,10 +577,6 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
                 qpb_model = qpb_pattern[ch].yaxis[pattern]
                 spf_model = spf_scale*spf_pattern[ch].yaxis[pattern]
                 xray_model = xray_scale_sum*xray_pattern[ch].yaxis[pattern]
-                data_cnt_sum += data_cnt
-                qpb_model_sum += qpb_model
-                spf_model_sum += spf_model
-                xray_model_sum += xray_model
                 if data_cnt==0: continue
                 pattern_weight = 1./pow(data_cnt,0.5)
                 #pattern_weight = 1./data_cnt
@@ -594,31 +586,27 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
             #chi2 += chi_sum
             chi2 += chi_sum*chi_sum
             
-            if energy_range[ch]>=11000:  # almost X-ray free because of low effective area
-                penalty_chi = 0.
-                for pattern in range(0,5):
-                    data_cnt = data_pattern[ch].yaxis[pattern]
-                    qpb_model = qpb_pattern[ch].yaxis[pattern]
-                    spf_model = spf_scale*spf_pattern[ch].yaxis[pattern]
-                    xray_model = xray_scale_sum*xray_pattern[ch].yaxis[pattern]
-                    data_cnt_sum += data_cnt
-                    qpb_model_sum += qpb_model
-                    spf_model_sum += spf_model
-                    xray_model_sum += xray_model
-                    if data_cnt==0: continue
-                    pattern_weight = 1./pow(data_cnt,0.5)
-                    chi = (data_cnt - spf_model - qpb_model)*pattern_weight
-                    penalty_chi += chi
+            penalty_chi = 0.
+            for pattern in range(0,5):
+                xray_model = xray_scale_sum*xray_pattern[ch].yaxis[pattern]
+                pattern_weight = 1./pow(data_cnt,0.5)
+                chi = xray_model*pattern_weight
+                penalty_chi += chi
+            if penalty_chi<0.:
                 chi2 += penalty_chi*penalty_chi
 
-            #channel_weight = 1./pow(data_cnt_sum,0.5)
-            #penalty_xray = 0.
-            #if xray_model<0.:
-            #    penalty_xray = abs(xray_model_sum)*channel_weight
-            #penalty_spf = 0.
-            #if spf_model<0.:
-            #    penalty_spf = abs(spf_model_sum)*channel_weight
-            #chi2 += penalty_xray*penalty_xray + penalty_spf*penalty_spf
+            #if energy_range[ch]>=11000:  # almost X-ray free because of low effective area
+            #    penalty_chi = 0.
+            #    for pattern in range(0,5):
+            #        data_cnt = data_pattern[ch].yaxis[pattern]
+            #        qpb_model = qpb_pattern[ch].yaxis[pattern]
+            #        spf_model = spf_scale*spf_pattern[ch].yaxis[pattern]
+            #        xray_model = xray_scale_sum*xray_pattern[ch].yaxis[pattern]
+            #        if data_cnt==0: continue
+            #        pattern_weight = 1./pow(data_cnt,0.5)
+            #        chi = (data_cnt - spf_model - qpb_model)*pattern_weight
+            #        penalty_chi += chi
+            #    chi2 += penalty_chi*penalty_chi
 
         return chi2
 

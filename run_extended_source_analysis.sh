@@ -1,86 +1,67 @@
-#
-#python3 xmm_extended_source_analysis.py 'extragalactic' 'ID0827251101' # Percentage of flaring time: 0.0%
-#
-#python3 xmm_extended_source_analysis.py 'extragalactic' 'ID0827251001' # Percentage of flaring time: 0.0% 
-#python3 xmm_extended_source_analysis.py 'extragalactic' 'ID0690900101' # Percentage of flaring time: 0.0% 
-#python3 xmm_extended_source_analysis.py 'extragalactic' 'ID0505460501' # Percentage of flaring time: 60%
-#python3 xmm_extended_source_analysis.py 'extragalactic' 'ID0820560101' # Percentage of flaring time: 48.8%
-#python3 xmm_extended_source_analysis.py 'extragalactic' 'ID0803160301' # Percentage of flaring time: 28.4%
-#python3 xmm_extended_source_analysis.py 'extragalactic' 'ID0827241101' # Percentage of flaring time: 15.2%
-#python3 xmm_extended_source_analysis.py 'extragalactic' 'ID0827200401' # Percentage of flaring time: 11.9%
-#python3 xmm_extended_source_analysis.py 'extragalactic' 'ID0827200501' # Percentage of flaring time: 6%
-
-#python3 xmm_extended_source_analysis.py 'RX_J1241.5_p3250' 'ID0056020901'
-#python3 xmm_extended_source_analysis.py 'RX_J0256.5_p0006' 'ID0056020301'
-#python3 xmm_extended_source_analysis.py 'RX_J1713.7_m3941' 'ID0093670301'
-#python3 xmm_extended_source_analysis.py 'MGRO_J1908_p06' 'ID0553640201'
-#python3 xmm_extended_source_analysis.py '3HWC_J1928_p178' 'ID0902120101'
-#
-#python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0412180101'
-#python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0400210101' # Cas A Northern lobe
-#python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0782961401' # angular distance to Cas A: 34.7 arcmin
-#python3 xmm_extended_source_analysis.py 'Cas_A' 'ID0764640101' # angular distance to Cas A: 144.51 arcmin, broken
-#
-#python3 xmm_extended_source_analysis.py 'PSR_J1856_p0245' 'ID0302970201'
-
 
 #source_name='extragalactic'
-#ID_array=()
-#ID_array+=('ID0827241101') # 51% SPF
-#ID_array+=('ID0505460501') # 27% SPF
-#ID_array+=('ID0804860301') # 25% SPF
-#ID_array+=('ID0690900101') # 21% SPF
-#ID_array+=('ID0803160301') # 10% SPF
-#ID_array+=('ID0820560101') # 0% SPF
-#ID_array+=('ID0827200401') # 4% SPF
-#ID_array+=('ID0827200501') # 0% SPF
-#ID_array+=('ID0827251001') # 0% SPF
-#ID_array+=('ID0827251101') # 0% SPF
+#ID_list=()
+#ID_list+=('0827241101') # 51% SPF
+#ID_list+=('0505460501') # 27% SPF
+#ID_list+=('0804860301') # 25% SPF
+#ID_list+=('0690900101') # 21% SPF
+#ID_list+=('0803160301') # 10% SPF
+#ID_list+=('0820560101') # 0% SPF
+#ID_list+=('0827200401') # 4% SPF
+#ID_list+=('0827200501') # 0% SPF
+#ID_list+=('0827251001') # 0% SPF
+#ID_list+=('0827251101') # 0% SPF
 
 
 #source_name='Cas_A'
-#ID_array=()
-#ID_array+=('ID0137550301') # no MOS2
-#ID_array+=('ID0400210101') # Cas A Northern lobe
-#ID_array+=('ID0412180101') # Cas A
-#ID_array+=('ID0782961401') # 34.7 arcmin away
-#ID_array+=('ID0764640101') # 144.51 arcmin away, broken
+#ID_list=()
+#ID_list+=('0137550301') # no MOS2
+#ID_list+=('0400210101') # Cas A Northern lobe
+#ID_list+=('0412180101') # Cas A
+#ID_list+=('0782961401') # 34.7 arcmin away
+#ID_list+=('0764640101') # 144.51 arcmin away, broken
 
 #source_name='3HWC_J1928_p178'
-#ID_array=()
-#ID_array+=('ID0902120101')
-#ID_array+=('ID0503740101')
-#ID_array+=('ID0830192001')
-#ID_array+=('ID0406730101')
-#ID_array+=('ID0762980101')
-#ID_array+=('ID0742710301')
-#ID_array+=('ID0822330301')
-#ID_array+=('ID0861880101') # 57% SPF
-#ID_array+=('ID0841190101') # bright source
-#ID_array+=('ID0851181701') # bright source
-#ID_array+=('ID0724270101') # SNR with escaped CRs?
-#ID_array+=('ID0724270201') # bright SNR
-#ID_array+=('ID0742710401') # broken chip
-#ID_array+=('ID0763240101') # strange ring patterns
-#ID_array+=('ID0822330201') # strange ring patterns
+#ID_list=()
+#ID_list+=('0902120101')
+#ID_list+=('0503740101')
+#ID_list+=('0830192001')
+#ID_list+=('0406730101')
+#ID_list+=('0762980101')
+#ID_list+=('0742710301')
+#ID_list+=('0822330301')
+#ID_list+=('0861880101') # 57% SPF
+#ID_list+=('0841190101') # bright source
+#ID_list+=('0851181701') # bright source
+#ID_list+=('0724270101') # SNR with escaped CRs?
+#ID_list+=('0724270201') # bright SNR
+#ID_list+=('0742710401') # broken chip
+#ID_list+=('0763240101') # strange ring patterns
+#ID_list+=('0822330201') # strange ring patterns
 
 #source_name='IC_443'
-#ID_array=('ID0301960101')
+#ID_list=('ID0301960101')
 
-source_name='skycoord_l0_b25'
-ID_array=()
-ID_array+=('0083000101')
-ID_array+=('0672660401')
-ID_array+=('0844050101')
-ID_array+=('0112880101')
-ID_array+=('0556200301')
-ID_array+=('0110930101')
-ID_array+=('0691320601')
-ID_array+=('0202940201')
-ID_array+=('0822470101')
+source_name='skycoord_l0_b20'
+ID_list=()
+ID_list+=('0201770201')
+ID_list+=('0651281401')
+ID_list+=('0552070101')
+ID_list+=('0763050301')
+ID_list+=('0672660401')
+ID_list+=('0852180401')
+ID_list+=('0871390801')
+ID_list+=('0800730901')
+ID_list+=('0311590401')
+ID_list+=('0784770801')
+ID_list+=('0824420101')
+ID_list+=('0502950101')
+ID_list+=('0401870201')
+ID_list+=('0094810301')
+ID_list+=('0690330101')
 
 
-for i in ${ID_array[@]}
+for i in ${ID_list[@]}
 do
     obs_ID='ID'$i
     rm -r /Users/rshang/xmm_analysis/output_plots/$source_name/$obs_ID
