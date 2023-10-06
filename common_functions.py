@@ -1,5 +1,6 @@
 
 import numpy as np
+import csv
 from numpy.linalg import inv
 import math
 
@@ -11,7 +12,7 @@ ch_high = 12000
 ch_scale = 100
 t_low = 0
 t_high = 1
-t_scale = 0.02
+t_scale = 0.01
 detx_low = -20000
 detx_high = 20000
 detx_scale = 200
@@ -210,10 +211,17 @@ class MyArray1D:
             self.yaxis[entry] = self.yaxis[entry]/reference
             self.yerr[entry] = self.yerr[entry]/reference
     def normalize2(self):
+        for entry in range(0,len(self.yaxis)):
+            if self.yaxis[entry]<0.:
+                self.yaxis[entry] = 0.
         reference = self.integral()
         for entry in range(0,len(self.yaxis)):
-            self.yaxis[entry] = self.yaxis[entry]/reference
-            self.yerr[entry] = self.yerr[entry]/reference
+            if reference>0.:
+                self.yaxis[entry] = self.yaxis[entry]/reference
+                self.yerr[entry] = self.yerr[entry]/reference
+            else:
+                self.yaxis[entry] = 0.
+                self.yerr[entry] = 0.
     def calc_significance(self, src_array, bkg_array):
         for idx_x in range(0,len(self.xaxis)):
             src = src_array.yaxis[idx_x]
@@ -392,4 +400,170 @@ def LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID,detector):
     mtx_conv_det_2_sky = np.matmul(mtx_delta_sky,inv_mtx_delta_det)
 
     return origin_sky, origin_det, mtx_conv_det_2_sky, mtx_conv_sky_2_det
+
+def HMS2deg(ra='', dec=''):
+    RA, DEC, rs, ds = '', '', 1, 1
+    if dec:
+        D, M, S = [float(i) for i in dec.split(':')]
+        if str(D)[0] == '-':
+            ds, D = -1, abs(D)
+        deg = D + (M/60) + (S/3600)
+        DEC = '{0}'.format(deg*ds)
+    if ra:
+        H, M, S = [float(i) for i in ra.split(':')]
+        if str(H)[0] == '-':
+            rs, H = -1, abs(H)
+        deg = (H*15) + (M/4) + (S/240)
+        RA = '{0}'.format(deg*rs)
+    if ra and dec:
+        return (RA, DEC)
+    else:
+        return RA or DEC
+
+def ReadHAWCTargetListFromFile():
+    source_name = []
+    source_ra = []
+    source_dec = []
+    inputFile = open('Cat_3HWC.txt')
+    for line in inputFile:
+        if line[0]=="#": continue
+        if '- name:' in line:
+            target_name = line.lstrip('   - name: ')
+            target_name = target_name.strip('\n')
+        if 'RA:' in line:
+            target_ra = line.lstrip('     RA: ')
+        if 'Dec:' in line:
+            target_dec = line.lstrip('     Dec: ')
+        if 'flux measurements:' in line:
+            source_name += [target_name]
+            source_ra += [float(target_ra)]
+            source_dec += [float(target_dec)]
+            target_name = ''
+            target_ra = ''
+            target_dec = ''
+    return source_name, source_ra, source_dec
+
+def ReadSNRTargetListFromCSVFile():
+    source_name = []
+    source_ra = []
+    source_dec = []
+    source_size = []
+    with open('SNRcat20221001-SNR.csv', newline='') as csvfile:
+        reader = csv.reader(csvfile, delimiter=';')
+        for row in reader:
+            if len(row)==0: continue
+            if '#' in row[0]: continue
+            target_name = row[0]
+            target_min_dist = row[13]
+            if target_min_dist=='':
+                target_min_dist = '1000'
+            #if float(target_min_dist)>6.: continue
+            target_size = row[15]
+            if target_size=='':
+                target_size = 0.
+            target_ra = row[19]
+            target_dec = row[20]
+            source_name += [target_name]
+            source_ra += [float(HMS2deg(target_ra,target_dec)[0])]
+            source_dec += [float(HMS2deg(target_ra,target_dec)[1])]
+            source_size += [0.5*float(target_size)/60.]
+            #print('target_min_dist = %s'%(target_min_dist))
+            #print('source_name = %s'%(source_name[len(source_name)-1]))
+            #print('source_ra = %0.2f'%(source_ra[len(source_ra)-1]))
+            #print('source_dec = %0.2f'%(source_dec[len(source_dec)-1]))
+            #print(row)
+    return source_name, source_ra, source_dec, source_size
+
+def ReadATNFTargetListFromFile():
+    source_name = []
+    source_ra = []
+    source_dec = []
+    source_dist = []
+    source_age = []
+    source_edot = []
+    inputFile = open('ATNF_pulsar_full_list.txt')
+    for line in inputFile:
+        if line[0]=="#": continue
+        target_name = line.split(',')[0].strip(" ")
+        if target_name=="\n": continue
+        target_ra = line.split(',')[1].strip(" ")
+        target_dec = line.split(',')[2].strip(" ")
+        target_dist = line.split(',')[3].strip(" ")
+        target_age = line.split(',')[4].strip(" ")
+        target_edot = line.split(',')[5].strip(" ")
+        if target_dist=='*': continue
+        if target_age=='*': continue
+        if target_edot=='*': continue
+        target_brightness = float(target_edot)/pow(float(target_dist),2)
+
+        if float(target_edot)<1e35: continue
+        #if float(target_dist)>6.: continue
+
+        #ra_deg = float(HMS2deg(target_ra,target_dec)[0])
+        #dec_deg = float(HMS2deg(target_ra,target_dec)[1])
+        #gal_l, gal_b = ConvertRaDecToGalactic(ra_deg,dec_deg)
+        #if abs(gal_b)<5.: continue
+
+        source_name += [target_name]
+        source_ra += [float(HMS2deg(target_ra,target_dec)[0])]
+        source_dec += [float(HMS2deg(target_ra,target_dec)[1])]
+        source_dist += [float(target_dist)]
+        source_age += [float(target_age)]
+        source_edot += [float(target_edot)]
+    return source_name, source_ra, source_dec, source_dist, source_age
+
+def DrawSkyMap(fig,map_color,image_data,save_name):
+
+    xmin = image_data.xaxis.min()
+    xmax = image_data.xaxis.max()
+    ymin = image_data.yaxis.min()
+    ymax = image_data.yaxis.max()
+
+    target_psr_name, target_psr_ra, target_psr_dec, target_psr_dist, target_psr_age = ReadATNFTargetListFromFile()
+    target_snr_name, target_snr_ra, target_snr_dec, target_snr_size = ReadSNRTargetListFromCSVFile()
+    target_hwc_name, target_hwc_ra, target_hwc_dec = ReadHAWCTargetListFromFile()
+
+    star_range = 0.8*(xmax-xmin)/2.
+    source_ra = (xmax+xmin)/2.
+    source_dec = (ymax+ymin)/2.
+    psr_markers = []
+    for star in range(0,len(target_psr_name)):
+        if abs(source_ra-target_psr_ra[star])>star_range: continue
+        if abs(source_dec-target_psr_dec[star])>star_range: continue
+        psr_markers += [[target_psr_ra[star],target_psr_dec[star],target_psr_name[star]]]
+    snr_markers = []
+    for star in range(0,len(target_snr_name)):
+        if abs(source_ra-target_snr_ra[star])>star_range: continue
+        if abs(source_dec-target_snr_dec[star])>star_range: continue
+        snr_markers += [[target_snr_ra[star],target_snr_dec[star],target_snr_name[star]]]
+    hwc_markers = []
+    for star in range(0,len(target_hwc_name)):
+        if abs(source_ra-target_hwc_ra[star])>star_range: continue
+        if abs(source_dec-target_hwc_dec[star])>star_range: continue
+        hwc_markers += [[target_hwc_ra[star],target_hwc_dec[star],target_hwc_name[star]]]
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    label_x = 'RA'
+    label_y = 'DEC'
+    axbig.set_xlabel(label_x)
+    axbig.set_ylabel(label_y)
+    axbig.imshow(image_data.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+
+    arrowprops = dict(arrowstyle="->")
+    for star in range(0,len(psr_markers)):
+        marker_size = 60
+        axbig.scatter(psr_markers[star][0], psr_markers[star][1], s=1.5*marker_size, c='k', marker='+')
+        axbig.annotate(psr_markers[star][2], xy=(psr_markers[star][0]+0.01, psr_markers[star][1]+0.01), xytext=(psr_markers[star][0]+0.05, psr_markers[star][1]+0.05), arrowprops=arrowprops)
+    for star in range(0,len(snr_markers)):
+        marker_size = 60
+        axbig.scatter(snr_markers[star][0], snr_markers[star][1], s=1.5*marker_size, c='k', marker='+')
+        axbig.annotate(snr_markers[star][2], xy=(snr_markers[star][0]+0.01, snr_markers[star][1]+0.01), xytext=(snr_markers[star][0]+0.05, snr_markers[star][1]+0.05), arrowprops=arrowprops)
+    for star in range(0,len(hwc_markers)):
+        marker_size = 60
+        axbig.scatter(hwc_markers[star][0], hwc_markers[star][1], s=1.5*marker_size, c='k', marker='+')
+        axbig.annotate(hwc_markers[star][2], xy=(hwc_markers[star][0]+0.01, hwc_markers[star][1]+0.01), xytext=(hwc_markers[star][0]+0.05, hwc_markers[star][1]+0.05), arrowprops=arrowprops)
+
+    fig.savefig("%s"%(save_name),bbox_inches='tight')
+    axbig.remove()
 

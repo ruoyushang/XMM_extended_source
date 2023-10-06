@@ -60,8 +60,8 @@ on_obsID = sys.argv[2]
 
 diagnostic_plots = True
 #diagnostic_plots = False
-#fast_test = True
-fast_test = False
+fast_test = True
+#fast_test = False
 
 #detector = 'mos1'
 #detector = 'mos2'
@@ -75,7 +75,7 @@ on_filter = sys.argv[4]
 #on_filter = 'reg4'
 
 #energy_array = [2000,4000,6000,8000,10000,12000]
-energy_array = [0,1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
+energy_array = [2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 #ana_ccd_bins = [1]
 ana_ccd_bins = [0]
@@ -289,6 +289,7 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
     #print(events.columns)
 
     evt_count = 0.
+    lightcurve_array_all = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
     lightcurve_array = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
     pattern_array = []
     spectrum_array = []
@@ -365,12 +366,6 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
             if distance<6000: continue
             if distance>12000: continue
 
-        if not mask_lc==None:
-            zscore = mask_lc.get_bin_content((evt_time-time_start)/(time_end-time_start))
-            if 'sp-veto' in evt_filter:
-                if zscore>0: continue
-            if 'sp-select' in evt_filter:
-                if zscore==0: continue
         if not mask_map==None:
             zscore = mask_map.get_bin_content(evt_detx,evt_dety)
             if zscore>=2.0: continue
@@ -394,6 +389,14 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
 
         if not 'cor-evt' in filename and not ccd_id==0:
             if evt_ccd_id!=ccd_id: continue
+
+        lightcurve_array_all.fill((evt_time-time_start)/(time_end-time_start))
+        if not mask_lc==None:
+            zscore = mask_lc.get_bin_content((evt_time-time_start)/(time_end-time_start))
+            if 'sp-veto' in evt_filter:
+                if zscore>0: continue
+            if 'sp-select' in evt_filter:
+                if zscore==0: continue
 
         #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
         ref_det_idx = 0
@@ -460,6 +463,19 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
         col_area = fits.Column(name='AREA', array=area_list, format='D')
         arf_out_table = fits.BinTableHDU.from_columns([col_energy,col_area],name='ENTRY')
         arf_out_table.writeto('%s/sci_area_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
+
+        time_list = []
+        all_evt_list = []
+        sci_evt_list = []
+        for t in range(0,len(lightcurve_array_all.xaxis)):
+            time_list += [lightcurve_array_all.xaxis[t]]
+            all_evt_list += [lightcurve_array_all.yaxis[t]]
+            sci_evt_list += [lightcurve_array.yaxis[t]]
+        col_time = fits.Column(name='TIME', array=time_list, format='D')
+        col_allevt = fits.Column(name='ALL_EVT', array=all_evt_list, format='D')
+        col_scievt = fits.Column(name='SCI_EVT', array=sci_evt_list, format='D')
+        lc_out_table = fits.BinTableHDU.from_columns([col_time,col_allevt,col_scievt],name='ENTRY')
+        lc_out_table.writeto('%s/sci_lightcurve_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
 
     return [obs_duration, evt_count, lightcurve_array, pattern_array, spectrum_array, detx_array, image_array]
 
@@ -595,6 +611,15 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
             if penalty_chi<0.:
                 chi2 += penalty_chi*penalty_chi
 
+            penalty_chi = 0.
+            for pattern in range(0,5):
+                spf_model = spf_scale*spf_pattern[ch].yaxis[pattern]
+                pattern_weight = 1./pow(data_cnt,0.5)
+                chi = spf_model*pattern_weight
+                penalty_chi += chi
+            if penalty_chi<0.:
+                chi2 += penalty_chi*penalty_chi
+
             #if energy_range[ch]>=11000:  # almost X-ray free because of low effective area
             #    penalty_chi = 0.
             #    for pattern in range(0,5):
@@ -689,39 +714,31 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     
 
     
-def make_timecut_mask(lightcurve_sci,lightcurve_cor,lightcurve_qpb):
+def make_timecut_mask(lightcurve_sci,lightcurve_cor,lightcurve_qpb,lightcurve_sci_fov_mask):
 
-    lightcurve_sci_fov_mask = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
+    avg_rate_fov = 0.
+    for idx in range(0,len(lightcurve_sci.xaxis)):
+        if lightcurve_sci_fov_mask.yaxis[idx]==1: continue
+        avg_rate_fov += (lightcurve_sci.yaxis[idx])
+    avg_rate_fov = avg_rate_fov/float(len(lightcurve_sci.xaxis))
 
-    avg_qpb = 0.
-    for idx in range(0,len(lightcurve_sci_fov_mask.xaxis)):
-        avg_qpb += lightcurve_qpb.yaxis[idx]
-    avg_qpb = avg_qpb/float(len(lightcurve_sci_fov_mask.xaxis))
+    avg_rate_cor = 0.
+    for idx in range(0,len(lightcurve_cor.xaxis)):
+        if lightcurve_sci_fov_mask.yaxis[idx]==1: continue
+        avg_rate_cor += (lightcurve_cor.yaxis[idx])
+    avg_rate_cor = avg_rate_cor/float(len(lightcurve_cor.xaxis))
 
-    for idx in range(0,len(lightcurve_sci_fov_mask.xaxis)):
-        sci_cnt = lightcurve_cor.yaxis[idx]
-        if sci_cnt/avg_qpb>1.2:
+    rms_rate_cor = 0.
+    for idx in range(0,len(lightcurve_cor.xaxis)):
+        if lightcurve_sci_fov_mask.yaxis[idx]==1: continue
+        rms_rate_cor += pow((lightcurve_cor.yaxis[idx])-avg_rate_cor,2)
+    rms_rate_cor = pow(rms_rate_cor/float(len(lightcurve_cor.xaxis)),0.5)
+    rms_rate_cor = rms_rate_cor*avg_rate_fov/avg_rate_cor
+
+    for idx in range(0,len(lightcurve_sci.xaxis)):
+        sci_rate = (lightcurve_sci.yaxis[idx])
+        if (sci_rate-avg_rate_fov)/rms_rate_cor>3.0:
             lightcurve_sci_fov_mask.yaxis[idx] = 1.
-        else:
-            lightcurve_sci_fov_mask.yaxis[idx] = 0.
-    
-    avg_cnt = 0.
-    used_pixels = 0.
-    for idx in range(0,len(lightcurve_sci_fov_mask.xaxis)):
-        if lightcurve_sci_fov_mask.yaxis[idx]==1.: continue
-        avg_cnt += lightcurve_sci.yaxis[idx]
-        used_pixels += 1.
-    avg_cnt = avg_cnt/used_pixels
-    if avg_cnt==0.:
-        return lightcurve_sci_fov_mask
-
-    for idx in range(0,len(lightcurve_sci_fov_mask.xaxis)):
-        sci_cnt = lightcurve_sci.yaxis[idx]
-        if sci_cnt/avg_cnt>1.3:
-            lightcurve_sci_fov_mask.yaxis[idx] = 1.
-        else:
-            lightcurve_sci_fov_mask.yaxis[idx] = 0.
-
 
     return lightcurve_sci_fov_mask
 
@@ -940,7 +957,9 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     on_lightcurve_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
     on_lightcurve_fwc_nsp.scale(fwc_2_sci_ratio)
 
-    on_mask_lc = make_timecut_mask(on_lightcurve_all_fov,on_lightcurve_all_cor,on_lightcurve_fwc_cor) 
+    on_mask_lc = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
+    make_timecut_mask(on_lightcurve_all_fov,on_lightcurve_all_cor,on_lightcurve_fwc_cor,on_mask_lc) 
+    make_timecut_mask(on_lightcurve_all_fov,on_lightcurve_all_cor,on_lightcurve_fwc_cor,on_mask_lc) 
 
     output_sci_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
     output_spf_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
@@ -1054,7 +1073,9 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     off_lightcurve_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
     off_lightcurve_fwc_nsp.scale(fwc_2_sci_ratio)
 
-    off_mask_lc = make_timecut_mask(off_lightcurve_all_fov,off_lightcurve_all_cor,off_lightcurve_fwc_cor) 
+    off_mask_lc = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
+    make_timecut_mask(off_lightcurve_all_fov,off_lightcurve_all_cor,off_lightcurve_fwc_cor,off_mask_lc) 
+    make_timecut_mask(off_lightcurve_all_fov,off_lightcurve_all_cor,off_lightcurve_fwc_cor,off_mask_lc) 
 
     if diagnostic_plots:
         fig.clf()
@@ -1156,8 +1177,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     
     for ch in range(0,len(energy_range)):
 
-        #fwc_2_sci_ratio = off_image_sci_cor[ch].integral()/off_image_fwc_cor[ch].integral()
-        #print ('After timecut, ch = %s, OFF data fwc_2_sci_ratio = %s'%(ch,fwc_2_sci_ratio))
+        fwc_2_sci_ratio = off_image_sci_cor[ch].integral()/off_image_fwc_cor[ch].integral()
+        print ('After timecut, ch = %s, OFF data fwc_2_sci_ratio = %s'%(ch,fwc_2_sci_ratio))
 
         off_spectrum_sci_cor[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
         off_spectrum_spf_fov[ch].scale(time_expo_sci_fov/time_expo_spf_fov)
@@ -1339,6 +1360,9 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     
     for ch in range(0,len(energy_range)):
 
+        fwc_2_sci_ratio = on_image_sci_cor[ch].integral()/on_image_fwc_cor[ch].integral()
+        print ('After timecut, ch = %s, OFF data fwc_2_sci_ratio = %s'%(ch,fwc_2_sci_ratio))
+
         on_spectrum_sci_cor[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
         on_spectrum_fwc_fov[ch].scale(fwc_2_sci_ratio)
         on_spectrum_fwc_cor[ch].scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
@@ -1439,7 +1463,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         qpb_spectrum_fov_template[ch].add(on_spectrum_fwc_fov[ch])
         qpb_detx_fov_template[ch].add(on_detx_fwc_fov[ch])
         qpb_image_fov_template[ch].add(on_image_fwc_fov[ch])
-        ch_norm = on_spectrum_fwc_fov[ch].integral()/on_pattern_fwc_fov[ch].integral()
+        #ch_norm = on_spectrum_fwc_fov[ch].integral()/on_pattern_fwc_fov[ch].integral()
+        ch_norm = 1.
         qpb_pattern_fov_template[ch].add(on_pattern_fwc_fov[ch],factor=ch_norm)
 
     for ch in range(0,len(energy_range)):
@@ -1452,7 +1477,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     for ch in range(0,len(energy_range)):
         xray_pattern_fov_template[ch].add(qpb_pattern_fov_template[ch])
 
-    xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov_mask,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
+    #xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov_mask,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
+    xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
         
     for ch in range(1,len(energy_range)):
         xray_scale = xray_cnt_list[ch-1]/xray_pattern_fov_template[ch].integral()

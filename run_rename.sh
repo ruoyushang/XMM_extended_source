@@ -7,6 +7,7 @@ echo $SAS_ODF
 
 cd analysis/
 
+echo "============================================================"
 mos1_fits=$(ls P*M1*EVL*)
 mos2_fits=$(ls P*M2*EVL*)
 echo "All files:"
@@ -19,8 +20,10 @@ select_mos2_fits=$2
 if [ -z "$select_mos1_fits" ]
 then
       echo "\$select_mos1_fits is empty"
-      select_mos1_fits=$(ls P*M1S001MIEVL*)
-      select_mos2_fits=$(ls P*M2S002MIEVL*)
+      #select_mos1_fits=$(ls P*M1S001MIEVL*)
+      #select_mos2_fits=$(ls P*M2S002MIEVL*)
+      select_mos1_fits=$(ls P*M1*EVL*)
+      select_mos2_fits=$(ls P*M2*EVL*)
       echo "Copy default files:"
       echo $select_mos1_fits
       echo $select_mos2_fits
