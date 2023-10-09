@@ -47,20 +47,21 @@
 #ID_list+=('0081340201')
 #ID_list+=('0111281001')
 
-#source_name='PSR_J1928_p1746'
-#ID_list=()
-#ID_list+=('0764820101')
-#ID_list+=('0605370101')
-#ID_list+=('0742710301')
-#ID_list+=('0503740101')
-#ID_list+=('0554690101')
-#ID_list+=('0871190201')
-#ID_list+=('0504230201')
-#ID_list+=('0853980101')
-#ID_list+=('0841190101')
-#ID_list+=('0406730101')
-#ID_list+=('0830192001')
-#ID_list+=('0902120101')
+source_name='PSR_J1928_p1746'
+ID_list=()
+#ID_list+=('0764820101_mos1' '0764820101_mos2')
+#ID_list+=('0605370101_mos1' '0605370101_mos2')
+#ID_list+=('0742710301_mos1' '0742710301_mos2')
+#ID_list+=('0503740101_mos1' '0503740101_mos2')
+#ID_list+=('0554690101_mos1' '0554690101_mos2')
+#ID_list+=('0871190201_mos1' '0871190201_mos2')
+#ID_list+=('0853980101_mos1' '0853980101_mos2')
+#ID_list+=('0406730101_mos1' '0406730101_mos2') # 3HWC J1930+188
+#ID_list+=('0830192001_mos1' '0830192001_mos2')
+#ID_list+=('0504230201_mos1' '0504230201_mos2') # too much SPF
+#ID_list+=('0841190101_mos1+0841190101_mos2') # bright source
+ID_list+=('0406730101_mos1+0406730101_mos2') # 3HWC J1930+188
+#ID_list+=('0902120101_mos1+0902120101_mos2') # source of interest
 
 #source_name='MGRO_J1908_p06'
 #ID_list=()
@@ -83,8 +84,8 @@
 #ID_list+=('0830450101')
 #ID_list+=('0506430101')
 
-source_name='MGRO_J2019_p37'
-ID_list=()
+#source_name='MGRO_J2019_p37'
+#ID_list=()
 #ID_list+=('0212481201_mos1')
 #ID_list+=('0692810501_mos1')
 #ID_list+=('0670480501_mos1')
@@ -98,11 +99,11 @@ ID_list=()
 #ID_list+=('0692810301_mos1')
 #ID_list+=('0206240201_mos1')
 #ID_list+=('0206240701_mos1')
-ID_list+=('0692810401_mos1')
+#ID_list+=('0692810401_mos1')
 #ID_list+=('0692810601_mos1')
 #ID_list+=('0723310201_mos1')
 #ID_list+=('0720600101_mos1')
-#
+##
 #ID_list+=('0212481201_mos2')
 #ID_list+=('0692810501_mos2')
 #ID_list+=('0670480501_mos2')
@@ -116,7 +117,7 @@ ID_list+=('0692810401_mos1')
 #ID_list+=('0692810301_mos2')
 #ID_list+=('0206240201_mos2')
 #ID_list+=('0206240701_mos2')
-ID_list+=('0692810401_mos2')
+#ID_list+=('0692810401_mos2')
 #ID_list+=('0692810601_mos2')
 #ID_list+=('0723310201_mos2')
 #ID_list+=('0720600101_mos2')
@@ -129,6 +130,8 @@ ID_list+=('0692810401_mos2')
 #ID_list+=('0206240401_mos2')
 #ID_list+=('0721570101_mos1') # too much SPF
 #ID_list+=('0721570101_mos2')
+#ID_list+=('0674050101_mos1')
+#ID_list+=('0674050101_mos2')
 
 #ID_list+=('0552350101_mos1+0552350101_mos2+0652770101_mos1+0674050101_mos1+0674050101_mos2')
 

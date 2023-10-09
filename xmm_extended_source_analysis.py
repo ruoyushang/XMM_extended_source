@@ -47,6 +47,8 @@ sky_dec_high = common_functions.sky_dec_high
 sky_scale = common_functions.sky_scale
 find_nearest_ref_det_idx = common_functions.find_nearest_ref_det_idx
 LoadCoordinateMatrix = common_functions.LoadCoordinateMatrix
+LoadCoordinateMatrix_v2 = common_functions.LoadCoordinateMatrix_v2
+GetSkyCoordinate = common_functions.GetSkyCoordinate
 
 
 fig, ax = plt.subplots()
@@ -60,8 +62,8 @@ on_obsID = sys.argv[2]
 
 diagnostic_plots = True
 #diagnostic_plots = False
-fast_test = True
-#fast_test = False
+#fast_test = True
+fast_test = False
 
 #detector = 'mos1'
 #detector = 'mos2'
@@ -98,9 +100,6 @@ if 'Cas_A' in on_sample:
 
 src_detx = 0
 src_dety = 0
-if 'ID0400210101' in on_obsID:
-    src_detx = 13000
-    src_dety = 13000
 
 def find_point_sources(image_data,image_mask):
 
@@ -164,6 +163,8 @@ def ConvertDet2Sky(target_det,origin_sky,origin_det,mtx_conv_det_2_sky):
     delta_det = target_det-origin_det
     delta_sky = np.matmul(mtx_conv_det_2_sky,delta_det)
     target_sky = delta_sky+origin_sky
+    if detector=='mos1':
+        target_sky = -delta_sky+origin_sky
 
     return target_sky[0,0], target_sky[0,1]
 
@@ -222,13 +223,8 @@ for idx_ra in range(0,1):
         ref_det += [ref_det_local]
         mtx_det_2_sky += [mtx_det_2_sky_local]
         mtx_sky_2_det += [mtx_sky_2_det_local]
-if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
-    ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(97,97,on_sample,on_obsID,detector)
-    ref_sky += [ref_sky_local]
-    ref_det += [ref_det_local]
-    mtx_det_2_sky += [mtx_det_2_sky_local]
-    mtx_sky_2_det += [mtx_sky_2_det_local]
 
+#matrix_det2sky_ra, matrix_det2sky_dec = LoadCoordinateMatrix_v2(on_sample,on_obsID,detector)
 
 #global_att_radec, global_mtx_conv_sky_2_det, global_mtx_conv_det_2_sky = get_conversion_mtx()
 #
@@ -400,9 +396,8 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
 
         #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
         ref_det_idx = 0
-        if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
-            ref_det_idx = 1
         evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
+        #evt_ra, evt_dec = GetSkyCoordinate(evt_detx,evt_dety,matrix_det2sky_ra,matrix_det2sky_dec)
         #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
 
         evt_detx_list += [evt_detx]
@@ -1644,8 +1639,6 @@ for ccd in range(0,len(ana_ccd_bins)):
     #            evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
     #            #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
     #            ref_det_idx = 0
-    #            if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
-    #                ref_det_idx = 1
     #            evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
     #            #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
     #            evt_pi = np.random.choice(a=prob_bkg_spectrum.xaxis, p=prob_bkg_spectrum.yaxis)
@@ -1688,9 +1681,8 @@ for ccd in range(0,len(ana_ccd_bins)):
                 evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
                 #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
                 ref_det_idx = 0
-                if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
-                    ref_det_idx = 1
                 evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
+                #evt_ra, evt_dec = GetSkyCoordinate(evt_detx,evt_dety,matrix_det2sky_ra,matrix_det2sky_dec)
                 #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
                 evt_pi = np.random.choice(a=prob_spf_spectrum.xaxis, p=prob_spf_spectrum.yaxis)
                 evt_detx_list += [evt_detx]
@@ -1732,9 +1724,8 @@ for ccd in range(0,len(ana_ccd_bins)):
                 evt_dety = np.random.uniform(low=pix_dety, high=pix_dety+detx_scale)
                 #ref_det_idx_x, ref_det_idx_y = find_nearest_ref_det_idx([evt_detx,evt_dety],ref_det)
                 ref_det_idx = 0
-                if on_obsID=='ID0412180101' or on_obsID=='ID0400210101':
-                    ref_det_idx = 1
                 evt_ra, evt_dec = ConvertDet2Sky([evt_detx,evt_dety],ref_sky[ref_det_idx],ref_det[ref_det_idx],mtx_det_2_sky[ref_det_idx])
+                #evt_ra, evt_dec = GetSkyCoordinate(evt_detx,evt_dety,matrix_det2sky_ra,matrix_det2sky_dec)
                 #evt_l, evt_b = ConvertRaDecToGalactic(evt_ra,evt_dec)
                 evt_pi = np.random.choice(a=prob_qpb_spectrum.xaxis, p=prob_qpb_spectrum.yaxis)
                 evt_detx_list += [evt_detx]

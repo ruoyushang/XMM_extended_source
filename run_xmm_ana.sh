@@ -63,10 +63,10 @@
 #obs_ID_list+=('0553640101')
 #obs_ID_list+=('0506430101')
 
-source_name='MGRO_J2019_p37'
-obs_ID_list=()
+#source_name='MGRO_J2019_p37'
+#obs_ID_list=()
 #obs_ID_list+=('0212481201')
-obs_ID_list+=('0744640101')
+#obs_ID_list+=('0744640101')
 #obs_ID_list+=('0692810501')
 #obs_ID_list+=('0670480501')
 #obs_ID_list+=('0652770101')
@@ -89,6 +89,22 @@ obs_ID_list+=('0744640101')
 #obs_ID_list+=('0723310201')
 #obs_ID_list+=('0721570101')
 #obs_ID_list+=('0720600101')
+#
+source_name='PSR_J1928_p1746'
+obs_ID_list=()
+obs_ID_list+=('0764820101')
+obs_ID_list+=('0605370101')
+obs_ID_list+=('0742710301')
+obs_ID_list+=('0503740101')
+obs_ID_list+=('0554690101')
+obs_ID_list+=('0871190201')
+obs_ID_list+=('0504230201')
+obs_ID_list+=('0853980101')
+obs_ID_list+=('0841190101')
+obs_ID_list+=('0406730101')
+obs_ID_list+=('0830192001')
+obs_ID_list+=('0902120101')
+
 
 for i in ${obs_ID_list[@]}
 do
@@ -105,12 +121,14 @@ do
     #sh clean.sh 
     #sh run_ana_chains.sh
     
-    sh run_rename.sh $1 $2
+    #sh run_rename.sh $1 $2
     
     #sh run_filtering.sh
     #sh run_skyref.sh
     #sh run_esky2det.sh
     #sh run_response.sh
+    #
+    #sh run_edet2sky.sh
 
 done
 

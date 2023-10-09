@@ -3,6 +3,7 @@ import numpy as np
 import csv
 from numpy.linalg import inv
 import math
+from matplotlib import colors
 
 pattern_low = 0
 pattern_high = 6
@@ -71,6 +72,16 @@ class MyArray2D:
                 key_idx_y = idx_y
         if key_idx_x>=0 and key_idx_y>=0:
             self.zaxis[key_idx_x,key_idx_y] += 1.*weight
+    def get_bin(self, value_x, value_y):
+        key_idx_x = 0
+        key_idx_y = 0
+        for idx_x in range(0,len(self.xaxis)-1):
+            if self.xaxis[idx_x]<=value_x and self.xaxis[idx_x+1]>value_x:
+                key_idx_x = idx_x
+        for idx_y in range(0,len(self.yaxis)-1):
+            if self.yaxis[idx_y]<=value_y and self.yaxis[idx_y+1]>value_y:
+                key_idx_y = idx_y
+        return [key_idx_x,key_idx_y]
     def get_bin_content(self, value_x, value_y):
         key_idx_x = 0
         key_idx_y = 0
@@ -205,6 +216,12 @@ class MyArray1D:
             if value_x>=self.xaxis[idx_x]:
                 key_idx_x = idx_x
         return self.yaxis[key_idx_x]
+    def get_bin_error(self, value_x):
+        key_idx_x = 0
+        for idx_x in range(0,len(self.xaxis)-1):
+            if value_x>=self.xaxis[idx_x]:
+                key_idx_x = idx_x
+        return self.yerr[key_idx_x]
     def normalize(self):
         reference = self.yaxis[0]
         for entry in range(0,len(self.yaxis)):
@@ -275,6 +292,57 @@ def find_nearest_ref_sky_idx(target_sky,ref_sky_list):
 
     return min_dist_idx_x, min_dist_idx_y
 
+
+def LoadCoordinateMatrix_v2(on_sample,on_obsID,detector):
+
+    print ('LoadCoordinateMatrix_v2...')
+    init_matrix_det2sky_ra = MyArray2D(pixel_scale=1800)
+    init_matrix_det2sky_dec = MyArray2D(pixel_scale=1800)
+
+    for idx_i in range(-10,11):
+        for idx_j in range(-10,11):
+            detx = idx_i*1800
+            dety = idx_j*1800
+            edet2sky_filename = '../%s/%s/analysis/sky_det_ref/%s_edet2sky_%s_%s.txt'%(on_sample,on_obsID,detector,detx,dety)
+            edet2sky_file = open(edet2sky_filename)
+            found_line = False
+            for line in edet2sky_file:
+                if found_line:
+                    line_strip = line.strip('\n')
+                    line_split = line_strip.split('   ')
+                    pix_ra = line_split[0]
+                    pix_dec = line_split[1]
+                    mtx_bin = init_matrix_det2sky_ra.get_bin(detx,dety)
+                    init_matrix_det2sky_ra.zaxis[mtx_bin[0],mtx_bin[1]] = pix_ra
+                    init_matrix_det2sky_dec.zaxis[mtx_bin[0],mtx_bin[1]] = pix_dec
+                    break
+                if 'RA (deg)   DEC (deg)' in line:
+                    found_line = True
+    return init_matrix_det2sky_ra, init_matrix_det2sky_dec
+
+def GetSkyCoordinate(evt_detx,evt_dety,init_matrix_det2sky_ra,init_matrix_det2sky_dec):
+
+    ref_mtx_bin = init_matrix_det2sky_ra.get_bin(evt_detx,evt_dety)
+    if ref_mtx_bin[0]<0: return 0, 0
+    if ref_mtx_bin[1]<0: return 0, 0
+    if ref_mtx_bin[0]+1>=len(init_matrix_det2sky_ra.xaxis): return 0, 0
+    if ref_mtx_bin[1]+1>=len(init_matrix_det2sky_ra.yaxis): return 0, 0
+    ref_detx_lo = init_matrix_det2sky_ra.xaxis[ref_mtx_bin[0]]
+    ref_dety_lo = init_matrix_det2sky_ra.yaxis[ref_mtx_bin[1]]
+    ref_ra_lo = init_matrix_det2sky_ra.zaxis[ref_mtx_bin[0],ref_mtx_bin[1]]
+    ref_dec_lo = init_matrix_det2sky_dec.zaxis[ref_mtx_bin[0],ref_mtx_bin[1]]
+    ref_detx_hi = init_matrix_det2sky_ra.xaxis[ref_mtx_bin[0]+1]
+    ref_dety_hi = init_matrix_det2sky_ra.yaxis[ref_mtx_bin[1]+1]
+    ref_ra_hi = init_matrix_det2sky_ra.zaxis[ref_mtx_bin[0]+1,ref_mtx_bin[1]+1]
+    ref_dec_hi = init_matrix_det2sky_dec.zaxis[ref_mtx_bin[0]+1,ref_mtx_bin[1]+1]
+    avg_ra_x = (ref_ra_hi-ref_ra_lo)/(ref_detx_hi-ref_detx_lo)*(evt_detx-ref_detx_lo) + ref_ra_lo
+    avg_dec_x = (ref_dec_hi-ref_dec_lo)/(ref_detx_hi-ref_detx_lo)*(evt_detx-ref_detx_lo) + ref_dec_lo
+    avg_ra_y = (ref_ra_hi-ref_ra_lo)/(ref_dety_hi-ref_dety_lo)*(evt_dety-ref_dety_lo) + ref_ra_lo
+    avg_dec_y = (ref_dec_hi-ref_dec_lo)/(ref_dety_hi-ref_dety_lo)*(evt_dety-ref_dety_lo) + ref_dec_lo
+    avg_ra = 0.5*(avg_ra_x+avg_ra_y)
+    avg_dec = 0.5*(avg_dec_x+avg_dec_y)
+
+    return avg_ra, avg_dec
 
 def LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID,detector):
 
@@ -512,7 +580,18 @@ def ReadATNFTargetListFromFile():
         source_edot += [float(target_edot)]
     return source_name, source_ra, source_dec, source_dist, source_age
 
-def DrawSkyMap(fig,map_color,image_data,save_name):
+def is_near_other_stars(src_ra,src_dec,other_ra,other_dec):
+
+    dist_cut = 0.02
+    for other in range(0,len(other_ra)):
+        diff_ra = src_ra - other_ra[other]
+        diff_dec = src_dec - other_dec[other]
+        dist = pow(diff_ra*diff_ra+diff_dec*diff_dec,0.5)
+        if dist<dist_cut:
+            return True
+    return False
+
+def DrawSkyMap(fig,map_color,image_data,save_name,log_scale=False):
 
     xmin = image_data.xaxis.min()
     xmax = image_data.xaxis.max()
@@ -523,24 +602,92 @@ def DrawSkyMap(fig,map_color,image_data,save_name):
     target_snr_name, target_snr_ra, target_snr_dec, target_snr_size = ReadSNRTargetListFromCSVFile()
     target_hwc_name, target_hwc_ra, target_hwc_dec = ReadHAWCTargetListFromFile()
 
+    target_xxx_name = []
+    target_xxx_ra = []
+    target_xxx_dec = []
+    target_xxx_name += ['CXO1928']
+    target_xxx_ra += [292.05]
+    target_xxx_dec += [17.78]
+
     star_range = 0.8*(xmax-xmin)/2.
     source_ra = (xmax+xmin)/2.
     source_dec = (ymax+ymin)/2.
+    xxx_markers = []
+    for star in range(0,len(target_xxx_name)):
+        if abs(source_ra-target_xxx_ra[star])>star_range: continue
+        if abs(source_dec-target_xxx_dec[star])>star_range: continue
+        xxx_markers += [[target_xxx_ra[star],target_xxx_dec[star],target_xxx_name[star]]]
     psr_markers = []
     for star in range(0,len(target_psr_name)):
         if abs(source_ra-target_psr_ra[star])>star_range: continue
         if abs(source_dec-target_psr_dec[star])>star_range: continue
+        if is_near_other_stars(target_psr_ra[star],target_psr_dec[star],target_xxx_ra,target_xxx_dec): continue
         psr_markers += [[target_psr_ra[star],target_psr_dec[star],target_psr_name[star]]]
     snr_markers = []
     for star in range(0,len(target_snr_name)):
         if abs(source_ra-target_snr_ra[star])>star_range: continue
         if abs(source_dec-target_snr_dec[star])>star_range: continue
+        if is_near_other_stars(target_snr_ra[star],target_snr_dec[star],target_xxx_ra,target_xxx_dec): continue
+        if is_near_other_stars(target_snr_ra[star],target_snr_dec[star],target_psr_ra,target_psr_dec): continue
         snr_markers += [[target_snr_ra[star],target_snr_dec[star],target_snr_name[star]]]
     hwc_markers = []
     for star in range(0,len(target_hwc_name)):
         if abs(source_ra-target_hwc_ra[star])>star_range: continue
         if abs(source_dec-target_hwc_dec[star])>star_range: continue
         hwc_markers += [[target_hwc_ra[star],target_hwc_dec[star],target_hwc_name[star]]]
+
+    total_stars = 0.
+    avg_ra = 0.
+    for star in range(0,len(xxx_markers)):
+        avg_ra += xxx_markers[star][0]
+        total_stars += 1.
+    for star in range(0,len(psr_markers)):
+        avg_ra += psr_markers[star][0]
+        total_stars += 1.
+    for star in range(0,len(snr_markers)):
+        avg_ra += snr_markers[star][0]
+        total_stars += 1.
+    for star in range(0,len(hwc_markers)):
+        avg_ra += hwc_markers[star][0]
+        total_stars += 1.
+    avg_ra = avg_ra/total_stars
+
+    xxx_lable_head_offset = []
+    xxx_lable_tail_offset = []
+    for star in range(0,len(xxx_markers)):
+        if xxx_markers[star][0]>avg_ra:
+            xxx_lable_head_offset += [[0.005,0.005]]
+            xxx_lable_tail_offset += [[0.05,0.05]]
+        else:
+            xxx_lable_head_offset += [[-0.005,0.005]]
+            xxx_lable_tail_offset += [[-0.05,0.05]]
+    psr_lable_head_offset = []
+    psr_lable_tail_offset = []
+    for star in range(0,len(psr_markers)):
+        if psr_markers[star][0]>avg_ra:
+            psr_lable_head_offset += [[0.005,0.005]]
+            psr_lable_tail_offset += [[0.05,0.05]]
+        else:
+            psr_lable_head_offset += [[-0.005,0.005]]
+            psr_lable_tail_offset += [[-0.05,0.05]]
+    snr_lable_head_offset = []
+    snr_lable_tail_offset = []
+    for star in range(0,len(snr_markers)):
+        if snr_markers[star][0]>avg_ra:
+            snr_lable_head_offset += [[0.005,0.005]]
+            snr_lable_tail_offset += [[0.05,0.05]]
+        else:
+            snr_lable_head_offset += [[-0.005,0.005]]
+            snr_lable_tail_offset += [[-0.05,0.05]]
+    hwc_lable_head_offset = []
+    hwc_lable_tail_offset = []
+    for star in range(0,len(hwc_markers)):
+        if hwc_markers[star][0]>avg_ra:
+            hwc_lable_head_offset += [[0.005,0.005]]
+            hwc_lable_tail_offset += [[0.05,0.05]]
+        else:
+            hwc_lable_head_offset += [[-0.005,0.005]]
+            hwc_lable_tail_offset += [[-0.05,0.05]]
 
     fig.clf()
     axbig = fig.add_subplot()
@@ -549,20 +696,26 @@ def DrawSkyMap(fig,map_color,image_data,save_name):
     axbig.set_xlabel(label_x)
     axbig.set_ylabel(label_y)
     axbig.imshow(image_data.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
+    if log_scale:
+        axbig.imshow(image_data.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax), norm=colors.LogNorm())
 
     arrowprops = dict(arrowstyle="->")
     for star in range(0,len(psr_markers)):
         marker_size = 60
-        axbig.scatter(psr_markers[star][0], psr_markers[star][1], s=1.5*marker_size, c='k', marker='+')
-        axbig.annotate(psr_markers[star][2], xy=(psr_markers[star][0]+0.01, psr_markers[star][1]+0.01), xytext=(psr_markers[star][0]+0.05, psr_markers[star][1]+0.05), arrowprops=arrowprops)
+        #axbig.scatter(psr_markers[star][0], psr_markers[star][1], s=1.5*marker_size, c='k', marker='+')
+        axbig.annotate(psr_markers[star][2], xy=(psr_markers[star][0]+psr_lable_head_offset[star][0], psr_markers[star][1]+psr_lable_head_offset[star][1]), xytext=(psr_markers[star][0]+psr_lable_tail_offset[star][0], psr_markers[star][1]+psr_lable_tail_offset[star][1]), arrowprops=arrowprops)
     for star in range(0,len(snr_markers)):
         marker_size = 60
-        axbig.scatter(snr_markers[star][0], snr_markers[star][1], s=1.5*marker_size, c='k', marker='+')
-        axbig.annotate(snr_markers[star][2], xy=(snr_markers[star][0]+0.01, snr_markers[star][1]+0.01), xytext=(snr_markers[star][0]+0.05, snr_markers[star][1]+0.05), arrowprops=arrowprops)
+        #axbig.scatter(snr_markers[star][0], snr_markers[star][1], s=1.5*marker_size, c='k', marker='+')
+        axbig.annotate(snr_markers[star][2], xy=(snr_markers[star][0]+snr_lable_head_offset[star][0], snr_markers[star][1]+snr_lable_head_offset[star][1]), xytext=(snr_markers[star][0]+snr_lable_tail_offset[star][0], snr_markers[star][1]+snr_lable_tail_offset[star][1]), arrowprops=arrowprops)
     for star in range(0,len(hwc_markers)):
         marker_size = 60
-        axbig.scatter(hwc_markers[star][0], hwc_markers[star][1], s=1.5*marker_size, c='k', marker='+')
-        axbig.annotate(hwc_markers[star][2], xy=(hwc_markers[star][0]+0.01, hwc_markers[star][1]+0.01), xytext=(hwc_markers[star][0]+0.05, hwc_markers[star][1]+0.05), arrowprops=arrowprops)
+        #axbig.scatter(hwc_markers[star][0], hwc_markers[star][1], s=1.5*marker_size, c='k', marker='+')
+        axbig.annotate(hwc_markers[star][2], xy=(hwc_markers[star][0]+hwc_lable_head_offset[star][0], hwc_markers[star][1]+hwc_lable_head_offset[star][1]), xytext=(hwc_markers[star][0]+hwc_lable_tail_offset[star][0], hwc_markers[star][1]+hwc_lable_tail_offset[star][1]), arrowprops=arrowprops)
+    for star in range(0,len(xxx_markers)):
+        marker_size = 60
+        #axbig.scatter(xxx_markers[star][0], xxx_markers[star][1], s=1.5*marker_size, c='k', marker='+')
+        axbig.annotate(xxx_markers[star][2], xy=(xxx_markers[star][0]+xxx_lable_head_offset[star][0], xxx_markers[star][1]+xxx_lable_head_offset[star][1]), xytext=(xxx_markers[star][0]+xxx_lable_tail_offset[star][0], xxx_markers[star][1]+xxx_lable_tail_offset[star][1]), arrowprops=arrowprops)
 
     fig.savefig("%s"%(save_name),bbox_inches='tight')
     axbig.remove()

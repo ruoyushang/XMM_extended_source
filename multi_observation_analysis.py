@@ -19,16 +19,19 @@ on_sample = sys.argv[1]
 on_obsID = sys.argv[2]
 job = sys.argv[3]
 
-measure_cxb = True
-#measure_cxb = False
+#measure_cxb = True
+measure_cxb = False
+
+include_cxb = True
+#include_cxb = False
 
 # background study
-find_extended_src = True
-select_mask_events = False
+#find_extended_src = True
+#select_mask_events = False
 
 # all events
-#find_extended_src = False
-#select_mask_events = False
+find_extended_src = False
+select_mask_events = False
 
 # select events in RoI
 #find_extended_src = True
@@ -82,6 +85,7 @@ figsize_y = 6.
 fig.set_figheight(figsize_y)
 fig.set_figwidth(figsize_x)
 map_color = 'coolwarm'
+color_list = ['salmon','yellowgreen','deepskyblue']
 
 on_run_list = on_obsID.split('+')
 
@@ -261,6 +265,7 @@ def draw_stacked_histogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,y
     axbig = fig.add_subplot()
     for h in range(0,len(hist_bkg)):
         axbig.fill_between(stack_bkg[h].xaxis,0.,stack_bkg[h].yaxis,color=bkg_colors[h],label=bkg_labels[h])
+    axbig.fill_between(stack_bkg[0].xaxis,stack_bkg[0].yaxis-stack_bkg[0].yerr,stack_bkg[0].yaxis+stack_bkg[0].yerr,color='k',alpha=0.2)
     axbig.errorbar(hist_data.xaxis,hist_data.yaxis,yerr=hist_data.yerr,color='k',label='Data')
     if log_scale:
         axbig.set_yscale('log')
@@ -270,6 +275,51 @@ def draw_stacked_histogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,y
     axbig.legend(loc='best')
     fig.savefig("%s"%(plot_name),bbox_inches='tight')
     axbig.remove()
+
+def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b):
+
+    cxb_file_name = "%s/cxb_%s.txt"%(cxb_output_dir,on_sample)
+    print (f'read {cxb_file_name}')
+    cxb_file = open(cxb_file_name)
+    cxb_measurement = []
+    for line in cxb_file:
+        if '#' in line:
+            line_split = line.split(';')
+            line_coord = line_split[3]
+            continue
+        line_strip = line.strip('\n')
+        line_split = line_strip.split(' ')
+        cxb_measurement_single = []
+        for entry in range(0,len(line_split)):
+            cxb_measurement_single += [float(line_split[entry])]
+        cxb_measurement += [cxb_measurement_single]
+    cxb_file.close()
+
+    hist_cxb_measurement = MyArray1D(bin_start=cxb_energy_array[0],bin_end=cxb_energy_array[len(cxb_energy_array)-1],pixel_scale=cxb_energy_array[1]-cxb_energy_array[0])
+    for ch in range(0,len(cxb_energy_array)-1):
+        n_samples = 0.
+        avg_cxb = 0.
+        for m in range(0,len(cxb_measurement)):
+            n_samples += 1.
+            avg_cxb += cxb_measurement[m][ch]
+        avg_cxb = avg_cxb/n_samples
+        hist_cxb_measurement.yaxis[ch] = avg_cxb
+    for ch in range(0,len(cxb_energy_array)-1):
+        n_samples = 0.
+        avg_cxb = hist_cxb_measurement.yaxis[ch]
+        rms_cxb = 0.
+        for m in range(0,len(cxb_measurement)):
+            n_samples += 1.
+            rms_cxb += pow(cxb_measurement[m][ch]-avg_cxb,2)
+        rms_cxb = pow(rms_cxb/n_samples,0.5)
+        hist_cxb_measurement.yerr[ch] = rms_cxb
+
+    for x in range(0,len(hist_cxb.xaxis)):
+        energy = hist_cxb.xaxis[x]
+        if energy<energy_cut_lower: continue
+        if energy>energy_cut_upper: continue
+        hist_cxb.yaxis[x] = hist_cxb_measurement.get_bin_content(energy)
+        hist_cxb.yerr[x] = hist_cxb_measurement.get_bin_error(energy)
 
 def analyze_one_observation(obsID,detector):
 
@@ -449,6 +499,7 @@ def analyze_one_observation(obsID,detector):
             else:
                 if mask!=1: continue
             spectrum_sci.fill(evt_pi,weight=1./areatime)
+            spectrum_comb_sci.fill(evt_pi,weight=1./areatime)
             image_det_sci.fill(evt_detx,evt_dety,weight=1./areatime)
             image_icrs_sci.fill(evt_ra,evt_dec,weight=1./areatime)
             detx_sci.fill(evt_detx,weight=1./areatime)
@@ -472,6 +523,7 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             areatime = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
             spectrum_qpb.fill(evt_pi,weight=1./areatime*1./sample_scale)
+            spectrum_comb_qpb.fill(evt_pi,weight=1./areatime*1./sample_scale)
             image_det_qpb.fill(evt_detx,evt_dety,weight=1./areatime*1./sample_scale)
             image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./areatime*1./sample_scale)
             detx_qpb.fill(evt_detx,weight=1./areatime*1./sample_scale)
@@ -495,6 +547,7 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             areatime = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
             spectrum_spf.fill(evt_pi,weight=1./areatime*1./sample_scale)
+            spectrum_comb_spf.fill(evt_pi,weight=1./areatime*1./sample_scale)
             image_det_spf.fill(evt_detx,evt_dety,weight=1./areatime*1./sample_scale)
             image_icrs_spf.fill(evt_ra,evt_dec,weight=1./areatime*1./sample_scale)
             detx_spf.fill(evt_detx,weight=1./areatime*1./sample_scale)
@@ -524,7 +577,7 @@ def analyze_one_observation(obsID,detector):
         edit_mode = 'w'
         if job!='0': edit_mode = 'a'
         cxb_file = open("%s/cxb_%s.txt"%(cxb_output_dir,on_sample),edit_mode)
-        cxb_file.write('# job %s, %s, %s, (l,b) = (%0.1f,%0.1f), %0.2f SPF \n'%(job,obsID,detector,sky_l_center,sky_b_center,spf_frac))
+        cxb_file.write('# job %s; %s; %s; (%0.1f,%0.1f); %0.2f SPF \n'%(job,obsID,detector,sky_l_center,sky_b_center,spf_frac))
         for entry in range(0,len(cxb_measurement_tmp)):
             cxb_file.write('%0.2f'%(cxb_measurement_tmp[entry]))
             if entry!=len(cxb_measurement_tmp)-1:
@@ -532,8 +585,9 @@ def analyze_one_observation(obsID,detector):
             else:
                 cxb_file.write('\n')
         cxb_file.close()
-    else:
-        get_cxb_spectrum(spectrum_cxb)
+    elif include_cxb:
+        get_cxb_spectrum(cxb_output_dir,spectrum_cxb,sky_l_center,sky_b_center)
+        spectrum_comb_cxb.add(spectrum_cxb)
 
     cxb_sum = spectrum_cxb.integral()
     qpb_sum = spectrum_qpb.integral()
@@ -607,7 +661,6 @@ def analyze_one_observation(obsID,detector):
     fig.savefig("%s/image_det_sci_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
     axbig.remove()
 
-    color_list = ['salmon','yellowgreen','deepskyblue']
     
     plot_data = spectrum_sci
     plot_bkg = []
@@ -715,11 +768,16 @@ sky_b_low = sky_b_lower-0.28
 sky_b_high = sky_b_upper+0.28
 
 image_icrs_size = max(sky_ra_high-sky_ra_low,sky_dec_high-sky_dec_low)
-image_icrs_sci = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=map_rebin*detx_scale*0.05/(60.*60.))
-image_icrs_xry = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=map_rebin*detx_scale*0.05/(60.*60.))
-image_icrs_qpb = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=map_rebin*detx_scale*0.05/(60.*60.))
-image_icrs_spf = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=map_rebin*detx_scale*0.05/(60.*60.))
-image_icrs_cxb = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=map_rebin*detx_scale*0.05/(60.*60.))
+image_icrs_sci = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
+image_icrs_xry = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
+image_icrs_qpb = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
+image_icrs_spf = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
+image_icrs_cxb = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
+spectrum_comb_sci = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+spectrum_comb_qpb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+spectrum_comb_spf = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+spectrum_comb_cxb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+spectrum_comb_xry = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
 
 for run in on_run_list:
     obsID = run.split('_')[0]
@@ -727,4 +785,22 @@ for run in on_run_list:
     analyze_one_observation(obsID,detector)
 
 output_dir = '/Users/rshang/xmm_analysis/output_plots/plot_%s/'%(on_sample)
-common_functions.DrawSkyMap(fig,map_color,image_icrs_sci,"%s/image_icrs_job%s.png"%(output_dir,job))
+common_functions.DrawSkyMap(fig,map_color,image_icrs_sci,"%s/image_icrs_job%s_%s.png"%(output_dir,job,obsID))
+common_functions.DrawSkyMap(fig,map_color,image_icrs_sci,"%s/image_icrs_log_job%s_%s.png"%(output_dir,job,obsID),log_scale=True)
+
+plot_data = spectrum_comb_sci
+plot_bkg = []
+plot_color = []
+plot_label = []
+plot_bkg += [spectrum_comb_cxb]
+plot_color += [color_list[2]]
+plot_label += ['CXB']
+plot_bkg += [spectrum_comb_spf]
+plot_color += [color_list[1]]
+plot_label += ['SPF']
+plot_bkg += [spectrum_comb_qpb]
+plot_color += [color_list[0]]
+plot_label += ['QPB']
+save_name = "%s/spectrum_comb_job%s_%s.png"%(output_dir,job,obsID)
+draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
+    
