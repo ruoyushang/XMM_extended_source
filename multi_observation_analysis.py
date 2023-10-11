@@ -43,6 +43,8 @@ ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 
 energy_cut_lower = 2000
+#energy_cut_lower = 8000
+#energy_cut_upper = 4000
 energy_cut_upper = 12000
 
 energy_array = [2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
@@ -213,7 +215,7 @@ def fft_filter(image_mask,image_data,image_fft_filter,lofreq_cut,hifreq_cut):
     # Compute the inverse Fourier transform to get the filtered image
     image_fft_filter.zaxis = np.real(fftpack.ifft2(F_filtered))
 
-def find_point_sources_with_gravity(mode,image_data,image_mask,threshold=4.0):
+def find_point_sources_with_gravity(mode,image_data,image_mask,threshold=5.0):
 
     print ('calculating pixel gravity...')
     kernel_radius = (detx_high-detx_low)/mode
@@ -374,70 +376,6 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
         hist_cxb.yaxis[x] = hist_cxb_measurement.get_bin_content(energy)
         hist_cxb.yerr[x] = hist_cxb_measurement.get_bin_error(energy)
 
-def get_cxb_radial(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=''):
-
-    cxb_file_name = "%s/cxb_radial_%s.txt"%(cxb_output_dir,on_sample)
-    print (f'read {cxb_file_name}')
-    cxb_file = open(cxb_file_name)
-    cxb_measurement = []
-    cxb_measurement_weight = []
-    use_this_data = True
-    for line in cxb_file:
-        if '#' in line:
-            line_split = line.split(';')
-            line_obsid = line_split[1]
-            line_detector = line_split[2]
-            line_coord = line_split[3]
-            line_coord = line_coord.strip('( )')
-            distance = pow(obs_sky_l-float(line_coord[0]),2)+pow(obs_sky_b-float(line_coord[1]),2)
-            distance = pow(distance,0.5)
-            if not obsID=='':
-                if not obsID in line_obsid:
-                    use_this_data = False
-            if not detector in line_detector:
-                use_this_data = False
-            continue
-        if not use_this_data: 
-            use_this_data = True
-            continue
-        line_strip = line.strip('\n')
-        line_split = line_strip.split(' ')
-        cxb_measurement_single = []
-        for entry in range(0,len(line_split)):
-            cxb_measurement_single += [float(line_split[entry])]
-        cxb_measurement += [cxb_measurement_single]
-        #cxb_measurement_weight += [1./distance]
-        cxb_measurement_weight += [1.]
-    cxb_file.close()
-
-    hist_cxb_measurement = MyArray1D(bin_start=cxb_radial_array[0],bin_end=cxb_radial_array[len(cxb_radial_array)-1],pixel_scale=cxb_radial_array[1]-cxb_radial_array[0])
-    for ch in range(0,len(cxb_radial_array)-1):
-        n_samples = 0.
-        avg_cxb = 0.
-        total_weight = 0.
-        for m in range(0,len(cxb_measurement)):
-            n_samples += 1.
-            total_weight += cxb_measurement_weight[m]
-            avg_cxb += cxb_measurement[m][ch]*cxb_measurement_weight[m]
-        avg_cxb = avg_cxb/total_weight
-        hist_cxb_measurement.yaxis[ch] = avg_cxb
-    for ch in range(0,len(cxb_radial_array)-1):
-        n_samples = 0.
-        avg_cxb = hist_cxb_measurement.yaxis[ch]
-        rms_cxb = 0.
-        total_weight = 0.
-        for m in range(0,len(cxb_measurement)):
-            n_samples += 1.
-            total_weight += cxb_measurement_weight[m]
-            rms_cxb += pow(cxb_measurement[m][ch]-avg_cxb,2)*cxb_measurement_weight[m]
-        rms_cxb = pow(rms_cxb/total_weight,0.5)
-        hist_cxb_measurement.yerr[ch] = rms_cxb
-
-    for x in range(0,len(hist_cxb.xaxis)):
-        dist = hist_cxb.xaxis[x]
-        hist_cxb.yaxis[x] = hist_cxb_measurement.get_bin_content(dist)
-        hist_cxb.yerr[x] = hist_cxb_measurement.get_bin_error(dist)
-
 def analyze_one_observation(obsID,detector):
 
     print ('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
@@ -511,6 +449,7 @@ def analyze_one_observation(obsID,detector):
     if find_extended_src:
         hist_gravity = find_point_sources_with_gravity(fft_lofreq_mode,image_det_diff_lofreq,image_det_mask)
         hist_gravity = find_point_sources_with_gravity(fft_lofreq_mode,image_det_diff_lofreq,image_det_mask)
+        hist_gravity = find_point_sources_with_gravity(fft_lofreq_mode,image_det_diff_lofreq,image_det_mask)
         fig.clf()
         axbig = fig.add_subplot()
         axbig.plot(hist_gravity.xaxis,hist_gravity.yaxis)
@@ -541,19 +480,11 @@ def analyze_one_observation(obsID,detector):
     image_det_spf = MyArray2D(pixel_scale=detx_scale)
     image_det_cxb = MyArray2D(pixel_scale=detx_scale)
     image_det_xry = MyArray2D(pixel_scale=detx_scale)
-    detx_sci = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=map_rebin*detx_scale)
-    detx_bkg = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=map_rebin*detx_scale)
-    detx_qpb = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=map_rebin*detx_scale)
-    detx_spf = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=map_rebin*detx_scale)
-    detx_cxb = MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=map_rebin*detx_scale)
-    dety_sci = MyArray1D(bin_start=dety_low,bin_end=dety_high,pixel_scale=map_rebin*dety_scale)
-    dety_bkg = MyArray1D(bin_start=dety_low,bin_end=dety_high,pixel_scale=map_rebin*dety_scale)
-    dety_qpb = MyArray1D(bin_start=dety_low,bin_end=dety_high,pixel_scale=map_rebin*dety_scale)
-    dety_spf = MyArray1D(bin_start=dety_low,bin_end=dety_high,pixel_scale=map_rebin*dety_scale)
-    dety_cxb = MyArray1D(bin_start=dety_low,bin_end=dety_high,pixel_scale=map_rebin*dety_scale)
     spectrum_sci = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     spectrum_qpb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+    spectrum_qpb_radial = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     spectrum_spf = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+    spectrum_spf_radial = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     spectrum_cxb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     spectrum_xry = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     image_icrs_sci = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
@@ -567,7 +498,11 @@ def analyze_one_observation(obsID,detector):
     radial_cxb = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
     radial_sci = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
 
-    area_curve = MyArray1D(bin_start=2000,bin_end=12000,pixel_scale=2000)
+    area_curve = []
+    area_curve += [MyArray1D(bin_start=2000,bin_end=12000,pixel_scale=2000)]
+    area_curve += [MyArray1D(bin_start=2000,bin_end=12000,pixel_scale=2000)]
+    area_curve += [MyArray1D(bin_start=2000,bin_end=12000,pixel_scale=2000)]
+    area_curve += [MyArray1D(bin_start=2000,bin_end=12000,pixel_scale=2000)]
     lightcurve_all = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
     lightcurve_sci = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
 
@@ -591,17 +526,18 @@ def analyze_one_observation(obsID,detector):
     sky_dec_center = sci_hdu_list[1].header['REF_DEC']
     sky_l_center, sky_b_center = ConvertRaDecToGalactic(sky_ra_center, sky_dec_center)
 
-    for ccd in range(0,len(ana_ccd_bins)):
-    
-        arf_filename = '%s/sci_area_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
+    for r in range(0,len(area_curve)):
+        arf_filename = '%s/sci_area_r%s_%s_ccd%s.fits'%(input_dir,r,detector,ana_ccd_bins[0])
         arf_hdu_list = fits.open(arf_filename)
         arf_table = Table.read(arf_filename, hdu=1)
         for entry in range(0,len(arf_table)):
             entry_energy = arf_table[entry]['ENERGY']
             entry_area = arf_table[entry]['AREA']
             print (f'energy = {entry_energy}, area = {entry_area}')
-            area_curve.fill(entry_energy,weight=entry_area)
+            area_curve[r].fill(entry_energy,weight=entry_area)
 
+    for ccd in range(0,len(ana_ccd_bins)):
+    
         lc_filename = '%s/sci_lightcurve_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         lc_hdu_list = fits.open(lc_filename)
         lc_table = Table.read(lc_filename, hdu=1)
@@ -625,9 +561,9 @@ def analyze_one_observation(obsID,detector):
             evt_dec = sci_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
-            spectral_density = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
-            spacial_density = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve.yaxis[0]
-            image_det_all.fill(evt_detx,evt_dety,weight=1./spacial_density)
+            spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[0].yaxis[0]
+            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[0].yaxis[0]
+            image_det_all.fill(evt_detx,evt_dety,weight=1./spacial_volume)
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -635,13 +571,11 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             delta_ra = evt_ra - sky_ra_center
             delta_dec = evt_dec - sky_dec_center
-            spectrum_sci.fill(evt_pi,weight=1./spectral_density)
-            spectrum_comb_sci.fill(evt_pi,weight=1./spectral_density*1./len_run_list)
-            image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_density)
-            image_icrs_sci.fill(evt_ra,evt_dec,weight=1./spacial_density)
-            image_icrs_comb_sci.fill(evt_ra,evt_dec,weight=1./spacial_density*1./len_run_list)
-            detx_sci.fill(evt_detx,weight=1./spacial_density)
-            dety_sci.fill(evt_dety,weight=1./spacial_density)
+            spectrum_sci.fill(evt_pi,weight=1./spectral_volume)
+            spectrum_comb_sci.fill(evt_pi,weight=1./spectral_volume*1./len_run_list)
+            image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_volume)
+            image_icrs_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume)
+            image_icrs_comb_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./len_run_list)
 
         qpb_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         qpb_hdu_list = fits.open(qpb_filename)
@@ -654,8 +588,10 @@ def analyze_one_observation(obsID,detector):
             evt_dec = qpb_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
-            spectral_density = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
-            spacial_density = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve.yaxis[0]
+            radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
+            radial_acceptance = area_curve[radius].yaxis[0]/area_curve[0].yaxis[0]
+            spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[0].yaxis[0]
+            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[0].yaxis[0]
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -663,13 +599,13 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             delta_ra = evt_ra - sky_ra_center
             delta_dec = evt_dec - sky_dec_center
-            spectrum_qpb.fill(evt_pi,weight=1./spectral_density*1./sample_scale)
-            spectrum_comb_qpb.fill(evt_pi,weight=1./spectral_density*1./sample_scale*1./len_run_list)
-            image_det_qpb.fill(evt_detx,evt_dety,weight=1./spacial_density*1./sample_scale)
-            image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./spacial_density*1./sample_scale)
-            image_icrs_comb_qpb.fill(evt_ra,evt_dec,weight=1./spacial_density*1./sample_scale*1./len_run_list)
-            detx_qpb.fill(evt_detx,weight=1./spacial_density*1./sample_scale)
-            dety_qpb.fill(evt_dety,weight=1./spacial_density*1./sample_scale)
+            spectrum_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale)
+            spectrum_comb_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list)
+            image_det_qpb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale)
+            image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale)
+            image_icrs_comb_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list)
+            image_icrs_cxb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance)
+            spectrum_qpb_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance)
 
         spf_filename = '%s/spf_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         spf_hdu_list = fits.open(spf_filename)
@@ -682,8 +618,10 @@ def analyze_one_observation(obsID,detector):
             evt_dec = spf_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
-            spectral_density = ch_scale/1000.*fov_size*exposure*area_curve.yaxis[0]
-            spacial_density = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve.yaxis[0]
+            radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
+            radial_acceptance = area_curve[radius].yaxis[0]/area_curve[0].yaxis[0]
+            spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[0].yaxis[0]
+            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[0].yaxis[0]
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -691,18 +629,29 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             delta_ra = evt_ra - sky_ra_center
             delta_dec = evt_dec - sky_dec_center
-            spectrum_spf.fill(evt_pi,weight=1./spectral_density*1./sample_scale)
-            spectrum_comb_spf.fill(evt_pi,weight=1./spectral_density*1./sample_scale*1./len_run_list)
-            image_det_spf.fill(evt_detx,evt_dety,weight=1./spacial_density*1./sample_scale)
-            image_icrs_spf.fill(evt_ra,evt_dec,weight=1./spacial_density*1./sample_scale)
-            image_icrs_comb_spf.fill(evt_ra,evt_dec,weight=1./spacial_density*1./sample_scale*1./len_run_list)
-            detx_spf.fill(evt_detx,weight=1./spacial_density*1./sample_scale)
-            dety_spf.fill(evt_dety,weight=1./spacial_density*1./sample_scale)
+            spectrum_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale)
+            spectrum_spf_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance)
+            spectrum_comb_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list)
+            image_det_spf.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*radial_acceptance)
+            image_icrs_spf.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*radial_acceptance)
+
+    spf_cnt = spectrum_spf.integral()
+    spf_radial_cnt = spectrum_spf_radial.integral()
+    spf_radial_norm = 0.
+    if spf_radial_cnt>0.:
+        spf_radial_norm = spf_cnt/spf_radial_cnt
+    image_det_spf.scale(spf_radial_norm)
+    image_icrs_spf.scale(spf_radial_norm)
+    image_icrs_comb_spf.add(image_icrs_spf,factor=1./len_run_list)
 
     qpb_cnt = spectrum_qpb.integral()
     spf_cnt = spectrum_spf.integral()
     spf_frac = spf_cnt/qpb_cnt
     print (f'spf_cnt/qpb_cnt = {spf_cnt/qpb_cnt}')
+
+    sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[0])
+    sci_hdu_list = fits.open(sci_filename)
+    exposure = sci_hdu_list[1].header['obs_duration']
 
     cxb_spectrum_measurement_tmp = []
     for ch in range(0,len(cxb_energy_array)-1):
@@ -717,21 +666,12 @@ def analyze_one_observation(obsID,detector):
     MakeRadialProjection(image_icrs_qpb, radial_qpb)
     MakeRadialProjection(image_icrs_spf, radial_spf)
 
-    cxb_radial_measurement_tmp = []
-    for ch in range(0,len(cxb_radial_array)-1):
-        sci_cnt = radial_sci.integral(integral_range=[cxb_radial_array[ch],cxb_radial_array[ch+1]])
-        spf_cnt = radial_spf.integral(integral_range=[cxb_radial_array[ch],cxb_radial_array[ch+1]])
-        qpb_cnt = radial_qpb.integral(integral_range=[cxb_radial_array[ch],cxb_radial_array[ch+1]])
-        bkg_cnt = spf_cnt+qpb_cnt
-        nbins = (cxb_radial_array[ch+1]-cxb_radial_array[ch])/(2.*detx_scale*0.05/(60.*60.))
-        cxb_radial_measurement_tmp += [(sci_cnt-bkg_cnt)/nbins]
-
     if measure_cxb:
         edit_mode = 'w'
         if job!='0': edit_mode = 'a'
 
         cxb_file = open("%s/cxb_spectrum_%s.txt"%(cxb_output_dir,on_sample),edit_mode)
-        cxb_file.write('# job %s; %s; %s; (%0.1f,%0.1f); %0.2f SPF \n'%(job,obsID,detector,sky_l_center,sky_b_center,spf_frac))
+        cxb_file.write('# job %s; %s; %s; (%0.1f,%0.1f); %0.2f SPF; %0.1f \n'%(job,obsID,detector,sky_l_center,sky_b_center,spf_frac,exposure))
         for entry in range(0,len(cxb_spectrum_measurement_tmp)):
             cxb_file.write('%0.2e'%(cxb_spectrum_measurement_tmp[entry]))
             if entry!=len(cxb_spectrum_measurement_tmp)-1:
@@ -740,35 +680,23 @@ def analyze_one_observation(obsID,detector):
                 cxb_file.write('\n')
         cxb_file.close()
 
-        cxb_file = open("%s/cxb_radial_%s.txt"%(cxb_output_dir,on_sample),edit_mode)
-        cxb_file.write('# job %s; %s; %s; (%0.1f,%0.1f); %0.2f SPF \n'%(job,obsID,detector,sky_l_center,sky_b_center,spf_frac))
-        for entry in range(0,len(cxb_radial_measurement_tmp)):
-            cxb_file.write('%0.2e'%(cxb_radial_measurement_tmp[entry]))
-            if entry!=len(cxb_radial_measurement_tmp)-1:
-                cxb_file.write(' ')
-            else:
-                cxb_file.write('\n')
-        cxb_file.close()
-
         get_cxb_spectrum(cxb_output_dir,spectrum_cxb,sky_l_center,sky_b_center,detector,obsID=obsID)
-        get_cxb_radial(cxb_output_dir,radial_cxb,sky_l_center,sky_b_center,detector,obsID=obsID)
 
     elif include_cxb:
         get_cxb_spectrum(cxb_output_dir,spectrum_cxb,sky_l_center,sky_b_center,detector)
         spectrum_comb_cxb.add(spectrum_cxb,factor=1./len_run_list)
-        get_cxb_radial(cxb_output_dir,radial_cxb,sky_l_center,sky_b_center,detector)
-        radial_comb_cxb.add(radial_cxb,factor=1./len_run_list)
 
     cxb_sum = spectrum_cxb.integral()
-    qpb_sum = spectrum_qpb.integral()
+    qpb_sum = spectrum_qpb_radial.integral()
     cxb_2_qpb_ratio = cxb_sum/qpb_sum
-    image_icrs_comb_cxb.add(image_icrs_comb_qpb,factor=cxb_2_qpb_ratio)
-    detx_cxb.add(detx_qpb,factor=cxb_2_qpb_ratio)
-    dety_cxb.add(dety_qpb,factor=cxb_2_qpb_ratio)
+    image_icrs_comb_cxb.add(image_icrs_cxb,factor=cxb_2_qpb_ratio)
 
     fig.clf()
     axbig = fig.add_subplot()
-    axbig.plot(area_curve.xaxis,area_curve.yaxis,color='k')
+    axbig.plot(area_curve[0].xaxis,area_curve[0].yaxis,label='R0')
+    axbig.plot(area_curve[1].xaxis,area_curve[1].yaxis,label='R1')
+    axbig.plot(area_curve[2].xaxis,area_curve[2].yaxis,label='R2')
+    axbig.plot(area_curve[3].xaxis,area_curve[3].yaxis,label='R3')
     axbig.set_xlabel('Energy [eV]')
     axbig.set_ylabel('Area [cm2]')
     axbig.legend(loc='best')
@@ -848,38 +776,6 @@ def analyze_one_observation(obsID,detector):
     save_name = "%s/spectrum_job%s_%s_%s.png"%(output_dir,job,obsID,detector)
     draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
     
-    plot_data = detx_sci
-    plot_bkg = []
-    plot_color = []
-    plot_label = []
-    plot_bkg += [detx_cxb]
-    plot_color += [color_list[2]]
-    plot_label += ['CXB']
-    plot_bkg += [detx_spf]
-    plot_color += [color_list[1]]
-    plot_label += ['SPF']
-    plot_bkg += [detx_qpb]
-    plot_color += [color_list[0]]
-    plot_label += ['QPB']
-    save_name = "%s/detx_job%s_%s_%s.png"%(output_dir,job,obsID,detector)
-    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'DETX','Photons /cm2/s/sr/keV',save_name)
-    
-    plot_data = dety_sci
-    plot_bkg = []
-    plot_color = []
-    plot_label = []
-    plot_bkg += [dety_cxb]
-    plot_color += [color_list[2]]
-    plot_label += ['CXB']
-    plot_bkg += [dety_spf]
-    plot_color += [color_list[1]]
-    plot_label += ['SPF']
-    plot_bkg += [dety_qpb]
-    plot_color += [color_list[0]]
-    plot_label += ['QPB']
-    save_name = "%s/dety_job%s_%s_%s.png"%(output_dir,job,obsID,detector)
-    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'DETY','Photons /cm2/s/sr/keV',save_name)
-
 
 def get_observation_pointings(run_list):
 
@@ -987,6 +883,7 @@ draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]
 MakeRadialProjection(image_icrs_comb_sci, radial_comb_sci)
 MakeRadialProjection(image_icrs_comb_qpb, radial_comb_qpb)
 MakeRadialProjection(image_icrs_comb_spf, radial_comb_spf)
+MakeRadialProjection(image_icrs_comb_cxb, radial_comb_cxb)
 
 plot_data = radial_comb_sci
 plot_bkg = []

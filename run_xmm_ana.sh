@@ -15,12 +15,6 @@
 #cd /Users/rshang/xmm_analysis/RX_J0256.5_p0006/ID0056020301
 #cd /Users/rshang/xmm_analysis/RX_J1713.7_m3941/ID0093670301
 #
-#cd /Users/rshang/xmm_analysis/Cas_A/ID0137550301
-#cd /Users/rshang/xmm_analysis/Cas_A/ID0412180101
-#cd /Users/rshang/xmm_analysis/Cas_A/ID0400210101
-#cd /Users/rshang/xmm_analysis/Cas_A/ID0764640101 # broken
-#cd /Users/rshang/xmm_analysis/Cas_A/ID0782961401
-#
 #cd /Users/rshang/xmm_analysis/IC_443/ID0301960101
 
 #cd /Users/rshang/xmm_analysis/PSR_J1856_p0245/ID0302970201
@@ -90,21 +84,35 @@
 #obs_ID_list+=('0721570101')
 #obs_ID_list+=('0720600101')
 #
-source_name='PSR_J1928_p1746'
-obs_ID_list=()
-obs_ID_list+=('0764820101')
-obs_ID_list+=('0605370101')
-obs_ID_list+=('0742710301')
-obs_ID_list+=('0503740101')
-obs_ID_list+=('0554690101')
-obs_ID_list+=('0871190201')
-obs_ID_list+=('0504230201')
-obs_ID_list+=('0853980101')
-obs_ID_list+=('0841190101')
-obs_ID_list+=('0406730101')
-obs_ID_list+=('0830192001')
-obs_ID_list+=('0902120101')
+#source_name='PSR_J1928_p1746'
+#obs_ID_list=()
+#obs_ID_list+=('0764820101')
+#obs_ID_list+=('0605370101')
+#obs_ID_list+=('0742710301')
+#obs_ID_list+=('0503740101')
+#obs_ID_list+=('0554690101')
+#obs_ID_list+=('0871190201')
+#obs_ID_list+=('0504230201')
+#obs_ID_list+=('0853980101')
+#obs_ID_list+=('0841190101')
+#obs_ID_list+=('0406730101')
+#obs_ID_list+=('0830192001')
+#obs_ID_list+=('0902120101')
 
+source_name='Cas_A'
+obs_ID_list=()
+obs_ID_list+=('0672960101')
+obs_ID_list+=('0412180101')
+obs_ID_list+=('0400210101')
+obs_ID_list+=('0820840301')
+obs_ID_list+=('0880580601')
+obs_ID_list+=('0782961401')
+obs_ID_list+=('0820840401')
+obs_ID_list+=('0057540101')
+obs_ID_list+=('0861170401')
+obs_ID_list+=('0400600101')
+obs_ID_list+=('0820840501')
+obs_ID_list+=('0149610301')
 
 for i in ${obs_ID_list[@]}
 do
@@ -126,7 +134,7 @@ do
     #sh run_filtering.sh
     #sh run_skyref.sh
     #sh run_esky2det.sh
-    #sh run_response.sh
+    sh run_response.sh
     #
     #sh run_edet2sky.sh
 

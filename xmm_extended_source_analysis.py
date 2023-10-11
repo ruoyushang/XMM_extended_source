@@ -435,29 +435,30 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
         my_table.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
         #fits.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), my_table, overwrite=True)
 
-        energy_list = []
-        area_list = []
-        arf_in_table = Table.read(arf_name, hdu=1)
-        for e in range(0,len(energy_array)-1):
-            energy_lo = energy_array[e]
-            energy_hi = energy_array[e+1]
-            entry_cnt = 0.
-            avg_area = 0.
-            for entry in range(0,len(arf_in_table)):
-                energy = 0.5*(arf_in_table[entry]['ENERG_LO']+arf_in_table[entry]['ENERG_HI'])*1000.
-                if energy<energy_lo: continue
-                if energy>=energy_hi: continue
-                area = arf_in_table[entry]['SPECRESP']
-                avg_area += area
-                entry_cnt += 1.
-            if entry_cnt>0:
-                avg_area = avg_area/entry_cnt
-            energy_list += [energy_lo]
-            area_list += [avg_area]
-        col_energy = fits.Column(name='ENERGY', array=energy_list, format='D')
-        col_area = fits.Column(name='AREA', array=area_list, format='D')
-        arf_out_table = fits.BinTableHDU.from_columns([col_energy,col_area],name='ENTRY')
-        arf_out_table.writeto('%s/sci_area_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
+        for arf in range(0,len(arf_name)):
+            energy_list = []
+            area_list = []
+            arf_in_table = Table.read(arf_name[arf], hdu=1)
+            for e in range(0,len(energy_array)-1):
+                energy_lo = energy_array[e]
+                energy_hi = energy_array[e+1]
+                entry_cnt = 0.
+                avg_area = 0.
+                for entry in range(0,len(arf_in_table)):
+                    energy = 0.5*(arf_in_table[entry]['ENERG_LO']+arf_in_table[entry]['ENERG_HI'])*1000.
+                    if energy<energy_lo: continue
+                    if energy>=energy_hi: continue
+                    area = arf_in_table[entry]['SPECRESP']
+                    avg_area += area
+                    entry_cnt += 1.
+                if entry_cnt>0:
+                    avg_area = avg_area/entry_cnt
+                energy_list += [energy_lo]
+                area_list += [avg_area]
+            col_energy = fits.Column(name='ENERGY', array=energy_list, format='D')
+            col_area = fits.Column(name='AREA', array=area_list, format='D')
+            arf_out_table = fits.BinTableHDU.from_columns([col_energy,col_area],name='ENTRY')
+            arf_out_table.writeto('%s/sci_area_r%s_%s_ccd%s.fits'%(output_dir,arf,detector,ccd_id), overwrite=True)
 
         time_list = []
         all_evt_list = []
@@ -774,13 +775,29 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     off_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-%s-evt.fits'%(off_sample,off_obsID,detector,on_filter)
     off_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(off_sample,off_obsID,detector)
     off_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(off_sample,off_obsID,detector)
-    off_arf_filename = '../%s/%s/analysis/%s-fov-arf.fits'%(off_sample,off_obsID,detector)
+    off_arf_r0_filename = '../%s/%s/analysis/%s-fov-r0-arf.fits'%(off_sample,off_obsID,detector)
+    off_arf_r1_filename = '../%s/%s/analysis/%s-fov-r1-arf.fits'%(off_sample,off_obsID,detector)
+    off_arf_r2_filename = '../%s/%s/analysis/%s-fov-r2-arf.fits'%(off_sample,off_obsID,detector)
+    off_arf_r3_filename = '../%s/%s/analysis/%s-fov-r3-arf.fits'%(off_sample,off_obsID,detector)
+    off_arf_filename = []
+    off_arf_filename += [off_arf_r0_filename]
+    off_arf_filename += [off_arf_r1_filename]
+    off_arf_filename += [off_arf_r2_filename]
+    off_arf_filename += [off_arf_r3_filename]
     
     on_sci_fov_evt_filename = '../%s/%s/analysis/%s-%s-evt.fits'%(on_sample,on_obsID,detector,on_filter)
     on_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-%s-evt.fits'%(on_sample,on_obsID,detector,on_filter)
     on_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(on_sample,on_obsID,detector)
     on_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(on_sample,on_obsID,detector)
-    on_arf_filename = '../%s/%s/analysis/%s-fov-arf.fits'%(on_sample,on_obsID,detector)
+    on_arf_r0_filename = '../%s/%s/analysis/%s-fov-r0-arf.fits'%(on_sample,on_obsID,detector)
+    on_arf_r1_filename = '../%s/%s/analysis/%s-fov-r1-arf.fits'%(on_sample,on_obsID,detector)
+    on_arf_r2_filename = '../%s/%s/analysis/%s-fov-r2-arf.fits'%(on_sample,on_obsID,detector)
+    on_arf_r3_filename = '../%s/%s/analysis/%s-fov-r3-arf.fits'%(on_sample,on_obsID,detector)
+    on_arf_filename = []
+    on_arf_filename += [on_arf_r0_filename]
+    on_arf_filename += [on_arf_r1_filename]
+    on_arf_filename += [on_arf_r2_filename]
+    on_arf_filename += [on_arf_r3_filename]
 
     #print ('prepare xray sample time cuts')
     #
@@ -971,7 +988,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         off_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-%s-evt.fits'%(off_sample,off_obsID,detector,on_filter)
         off_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(off_sample,off_obsID,detector)
         off_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(off_sample,off_obsID,detector)
-        off_arf_filename = '../%s/%s/analysis/%s-fov-arf.fits'%(off_sample,off_obsID,detector)
+        off_arf_filename = ['../%s/%s/analysis/%s-fov-arf.fits'%(off_sample,off_obsID,detector)]
 
     time_pix_frac_mask = on_mask_lc.get_pixel_fraction()
     print ('time_pix_frac_mask = %s'%(time_pix_frac_mask))
@@ -984,7 +1001,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         off_fwc_fov_evt_filename = '../%s/%s/analysis/%s-fwc-%s-evt.fits'%(off_sample,off_obsID,detector,on_filter)
         off_sci_cor_evt_filename = '../%s/%s/analysis/%s-cor-evt.fits'%(off_sample,off_obsID,detector)
         off_fwc_cor_evt_filename = '../%s/%s/analysis/%s-fwc-cor-evt.fits'%(off_sample,off_obsID,detector)
-        off_arf_filename = '../%s/%s/analysis/%s-fov-arf.fits'%(off_sample,off_obsID,detector)
+        off_arf_filename = ['../%s/%s/analysis/%s-fov-arf.fits'%(off_sample,off_obsID,detector)]
     if not SP_flare_mask:
         on_mask_lc = None
 
