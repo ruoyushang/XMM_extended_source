@@ -650,7 +650,8 @@ def DrawSkyMap(fig,map_color,image_data,save_name,log_scale=False):
     for star in range(0,len(hwc_markers)):
         avg_ra += hwc_markers[star][0]
         total_stars += 1.
-    avg_ra = avg_ra/total_stars
+    if total_stars>0.:
+        avg_ra = avg_ra/total_stars
 
     xxx_lable_head_offset = []
     xxx_lable_tail_offset = []
