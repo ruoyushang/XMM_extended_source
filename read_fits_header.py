@@ -23,7 +23,7 @@ for det in range(0,len(detector)):
     print ('[deg] DEC of target = %s'%(hdu_header['DEC_OBJ']))
     
     for idx_x in range(0,2):
-        delta_x = 0.1*float(idx_x)
+        delta_x = 0.01*float(idx_x)
         output_file = open('analysis/sky_det_ref/%s_target_ra_%s.txt'%(detector[det],idx_x), "w")
         output_file.write('%s\n'%(float(hdu_header['RA_OBJ'])-0.+delta_x))
         output_file.close()

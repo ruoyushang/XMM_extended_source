@@ -62,8 +62,8 @@ on_obsID = sys.argv[2]
 
 diagnostic_plots = True
 #diagnostic_plots = False
-#fast_test = True
-fast_test = False
+fast_test = True
+#fast_test = False
 
 #detector = 'mos1'
 #detector = 'mos2'
@@ -82,7 +82,7 @@ energy_array = [2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 #ana_ccd_bins = [1]
 ana_ccd_bins = [0]
 
-output_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/'+on_obsID
+output_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+on_obsID
 
 source_radius = 1000
 ring_inner_radius = 1500
@@ -162,9 +162,7 @@ def ConvertDet2Sky(target_det,origin_sky,origin_det,mtx_conv_det_2_sky):
 
     delta_det = target_det-origin_det
     delta_sky = np.matmul(mtx_conv_det_2_sky,delta_det)
-    target_sky = delta_sky+origin_sky
-    if detector=='mos1':
-        target_sky = -delta_sky+origin_sky
+    target_sky = -delta_sky+origin_sky
 
     return target_sky[0,0], target_sky[0,1]
 
@@ -218,7 +216,8 @@ mtx_det_2_sky = []
 mtx_sky_2_det = []
 for idx_ra in range(0,1):
     for idx_dec in range(0,1):
-        ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID,detector)
+        #ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID,detector)
+        ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID)
         ref_sky += [ref_sky_local]
         ref_det += [ref_det_local]
         mtx_det_2_sky += [mtx_det_2_sky_local]
@@ -328,13 +327,9 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
 
         evt_detx = events[evt]['DETX']
         evt_dety = events[evt]['DETY']
-        #evt_x = 0.
-        #evt_y = 0.
-        #if not 'extragalactic' in on_sample:
-        #    evt_detxy = np.array([evt_detx,evt_dety])
-        #    evt_xy = np.matmul(global_mtx_conv_det_2_sky,evt_detxy)
-        #    evt_x = evt_xy[0,0]+global_att_radec[0]
-        #    evt_y = evt_xy[0,1]+global_att_radec[1]
+        if 'mos2' in filename:
+            evt_detx = events[evt]['DETY']
+            evt_dety = -events[evt]['DETX']
 
         if evt_pi<energy_range[0]: continue
         if evt_pi>=energy_range[len(energy_range)-1]: continue
@@ -364,8 +359,7 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
 
         if not mask_map==None:
             zscore = mask_map.get_bin_content(evt_detx,evt_dety)
-            if zscore>=2.0: continue
-            if zscore<=-1.0: continue
+            if zscore>0: continue
 
         evt_ccd_id = 0
         if evt_detx<7000 and evt_detx>=-7000 and evt_dety<7000 and evt_dety>=-7000:
@@ -1384,7 +1378,10 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         on_detx_fwc_fov[ch].scale(fwc_2_sci_ratio)
         on_image_fwc_fov[ch].scale(fwc_2_sci_ratio)
 
-        on_pattern_sci_fov_mask[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_fov_mask)
+        on_spectrum_fwc_fov_mask[ch].scale(fwc_2_sci_ratio)
+        on_pattern_fwc_fov_mask[ch].scale(fwc_2_sci_ratio)
+        on_detx_fwc_fov_mask[ch].scale(fwc_2_sci_ratio)
+        #on_pattern_sci_fov_mask[ch].scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_fov_mask)
 
     if diagnostic_plots:
 
@@ -1463,11 +1460,13 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     print ('predict SP background')
     
     qpb_pattern_fov_template = []
+    qpb_pattern_fov_mask_template = []
     qpb_spectrum_fov_template = []
     qpb_detx_fov_template = []
     qpb_image_fov_template = []
     for ch in range(0,len(energy_range)):
         qpb_pattern_fov_template += [MyArray1D(bin_start=pattern_low,bin_end=pattern_high,pixel_scale=pattern_scale)]
+        qpb_pattern_fov_mask_template += [MyArray1D(bin_start=pattern_low,bin_end=pattern_high,pixel_scale=pattern_scale)]
         qpb_spectrum_fov_template += [MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)]
         qpb_detx_fov_template += [MyArray1D(bin_start=detx_low,bin_end=detx_high,pixel_scale=detx_scale)]
         qpb_image_fov_template += [MyArray2D()]
@@ -1475,9 +1474,9 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
         qpb_spectrum_fov_template[ch].add(on_spectrum_fwc_fov[ch])
         qpb_detx_fov_template[ch].add(on_detx_fwc_fov[ch])
         qpb_image_fov_template[ch].add(on_image_fwc_fov[ch])
-        #ch_norm = on_spectrum_fwc_fov[ch].integral()/on_pattern_fwc_fov[ch].integral()
         ch_norm = 1.
         qpb_pattern_fov_template[ch].add(on_pattern_fwc_fov[ch],factor=ch_norm)
+        qpb_pattern_fov_mask_template[ch].add(on_pattern_fwc_fov_mask[ch],factor=ch_norm)
 
     for ch in range(0,len(energy_range)):
         sp_rescale = qpb_pattern_fov_template[0].integral()/sp_pattern_fov_template[0].integral()
@@ -1489,29 +1488,33 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     for ch in range(0,len(energy_range)):
         xray_pattern_fov_template[ch].add(qpb_pattern_fov_template[ch])
 
-    #xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov_mask,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
-    xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
+    xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov_mask,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_mask_template)
+    #xray_cnt_list, spf_cnt_list, qpb_cnt_list = fit_pattern(energy_range,on_pattern_sci_fov,xray_pattern_fov_template,sp_pattern_fov_template,qpb_pattern_fov_template)
+
+    restore_mask_fov_factor = qpb_pattern_fov_template[ch].integral()/qpb_pattern_fov_mask_template[ch].integral()
+    print (f'area_pix_frac_fwc_fov/area_pix_frac_fwc_fov_mask = {area_pix_frac_fwc_fov/area_pix_frac_fwc_fov_mask}')
+    print (f'restore_mask_fov_factor = {restore_mask_fov_factor}')
         
     for ch in range(1,len(energy_range)):
-        xray_scale = xray_cnt_list[ch-1]/xray_pattern_fov_template[ch].integral()
+        xray_scale = xray_cnt_list[ch-1]/xray_pattern_fov_template[ch].integral()*restore_mask_fov_factor
         xray_pattern_fov_template[ch].scale(xray_scale)
-        qpb_scale = qpb_cnt_list[ch-1]/qpb_pattern_fov_template[ch].integral()
+        qpb_scale = qpb_cnt_list[ch-1]/qpb_pattern_fov_template[ch].integral()*restore_mask_fov_factor
         qpb_pattern_fov_template[ch].scale(qpb_scale)
-        sp_scale = spf_cnt_list[ch-1]/sp_pattern_fov_template[ch].integral()
+        sp_scale = spf_cnt_list[ch-1]/sp_pattern_fov_template[ch].integral()*restore_mask_fov_factor
         sp_pattern_fov_template[ch].scale(sp_scale)
 
-        qpb_scale = qpb_cnt_list[ch-1]/qpb_detx_fov_template[ch].integral()
+        qpb_scale = qpb_cnt_list[ch-1]/qpb_detx_fov_template[ch].integral()*restore_mask_fov_factor
         qpb_detx_fov_template[ch].scale(qpb_scale)
-        qpb_scale = qpb_cnt_list[ch-1]/qpb_image_fov_template[ch].integral()
+        qpb_scale = qpb_cnt_list[ch-1]/qpb_image_fov_template[ch].integral()*restore_mask_fov_factor
         qpb_image_fov_template[ch].scale(qpb_scale)
-        qpb_scale = qpb_cnt_list[ch-1]/qpb_spectrum_fov_template[ch].integral()
+        qpb_scale = qpb_cnt_list[ch-1]/qpb_spectrum_fov_template[ch].integral()*restore_mask_fov_factor
         qpb_spectrum_fov_template[ch].scale(qpb_scale)
 
-        sp_scale = spf_cnt_list[ch-1]/sp_spectrum_fov_template[ch].integral()
+        sp_scale = spf_cnt_list[ch-1]/sp_spectrum_fov_template[ch].integral()*restore_mask_fov_factor
         sp_spectrum_fov_template[ch].scale(sp_scale)
-        sp_scale = spf_cnt_list[ch-1]/sp_detx_fov_template[ch].integral()
+        sp_scale = spf_cnt_list[ch-1]/sp_detx_fov_template[ch].integral()*restore_mask_fov_factor
         sp_detx_fov_template[ch].scale(sp_scale)
-        sp_scale = spf_cnt_list[ch-1]/sp_image_fov_template[ch].integral()
+        sp_scale = spf_cnt_list[ch-1]/sp_image_fov_template[ch].integral()*restore_mask_fov_factor
         sp_image_fov_template[ch].scale(sp_scale)
 
 

@@ -344,7 +344,7 @@ def GetSkyCoordinate(evt_detx,evt_dety,init_matrix_det2sky_ra,init_matrix_det2sk
 
     return avg_ra, avg_dec
 
-def LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID,detector):
+def LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,on_obsID,detector='mos1'):
 
     idx_ra_offset1 = idx_ra+1
     idx_dec_offset1 = idx_dec+0

@@ -19,19 +19,29 @@ on_sample = sys.argv[1]
 on_obsID = sys.argv[2]
 job = sys.argv[3]
 
-measure_cxb = True
-#measure_cxb = False
+mask_ra = 350.8075
+mask_dec = 58.8072
+mask_inner_radius = 0.10
+mask_outer_radius = 0.15
 
-include_cxb = True
-#include_cxb = False
+mask_detx = 0.
+mask_dety = 0.
+mask_inner_detr = mask_inner_radius/(0.05/(60.*60.))
+mask_outer_detr = mask_outer_radius/(0.05/(60.*60.))
+
+#measure_cxb = True
+measure_cxb = False
+
+#include_cxb = True
+include_cxb = False
 
 # background study
-find_extended_src = True
-select_mask_events = False
+#find_extended_src = True
+#select_mask_events = False
 
 # all events
-#find_extended_src = False
-#select_mask_events = False
+find_extended_src = False
+select_mask_events = False
 
 # select events in RoI
 #find_extended_src = True
@@ -92,6 +102,23 @@ color_list = ['salmon','yellowgreen','deepskyblue']
 
 on_run_list = on_obsID.split('+')
 len_run_list = float(len(on_run_list))
+
+def ConvertSky2Det(target_sky,origin_det,origin_sky,mtx_conv_sky_2_det):
+
+    print (f'target_sky = {target_sky}')
+    print (f'origin_sky = {origin_sky}')
+
+    target_sky = np.array(target_sky)
+    origin_sky = np.array(origin_sky)
+    origin_det = np.array(origin_det)
+
+    delta_sky = target_sky-origin_sky
+    delta_det = np.matmul(np.transpose(mtx_conv_sky_2_det),delta_sky)
+    target_det = origin_det
+    target_det[0] += 1.*delta_det[0,0]
+    target_det[1] += 1.*delta_det[0,1]
+
+    return target_det[0], target_det[1]
 
 def ConvertGalacticToRaDec(l, b):
     my_sky = SkyCoord(l*my_unit.deg, b*my_unit.deg, frame='galactic')
@@ -314,11 +341,15 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
     cxb_measurement = []
     cxb_measurement_weight = []
     use_this_data = True
+    distance = 0.
+    exposure = 0.
     for line in cxb_file:
         if '#' in line:
             line_split = line.split(';')
             line_obsid = line_split[1]
             line_detector = line_split[2]
+            line_exposure = line_split[5].strip('\n')
+            exposure = float(line_exposure)
             line_coord = line_split[3]
             line_coord = line_coord.strip('( )')
             distance = pow(obs_sky_l-float(line_coord[0]),2)+pow(obs_sky_b-float(line_coord[1]),2)
@@ -339,7 +370,7 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
             cxb_measurement_single += [float(line_split[entry])]
         cxb_measurement += [cxb_measurement_single]
         #cxb_measurement_weight += [1./distance]
-        cxb_measurement_weight += [1.]
+        cxb_measurement_weight += [pow(exposure,0.5)/distance]
     cxb_file.close()
 
     if not obsID=='':
@@ -381,8 +412,8 @@ def analyze_one_observation(obsID,detector):
     print ('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
     print (f'analyze obsID {obsID} detector {detector}')
 
-    input_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/ID'+obsID
-    cxb_output_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample
+    input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/ID'+obsID
+    cxb_output_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample
     output_dir = '/Users/rshang/xmm_analysis/output_plots/plot_%s/'%(on_sample)
 
     print (f'input_dir = {input_dir}')
@@ -458,6 +489,16 @@ def analyze_one_observation(obsID,detector):
         axbig.legend(loc='best')
         fig.savefig("%s/gravity_lofreq_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
         axbig.remove()
+
+    for idx_x in range(0,len(image_det_mask.xaxis)):
+        for idx_y in range(0,len(image_det_mask.yaxis)):
+            pix_detx = image_det_mask.xaxis[idx_x]
+            pix_dety = image_det_mask.yaxis[idx_y]
+            distance = pow(pow(pix_detx-mask_detx,2)+pow(pix_dety-mask_dety,2),0.5)
+            if distance<mask_inner_detr:
+                image_det_mask.zaxis[idx_x,idx_y] = 1.
+            if distance>mask_outer_detr:
+                image_det_mask.zaxis[idx_x,idx_y] = 1.
 
     fig.clf()
     axbig = fig.add_subplot()
@@ -573,9 +614,9 @@ def analyze_one_observation(obsID,detector):
             delta_dec = evt_dec - sky_dec_center
             spectrum_sci.fill(evt_pi,weight=1./spectral_volume)
             spectrum_comb_sci.fill(evt_pi,weight=1./spectral_volume*1./len_run_list)
-            image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_volume)
             image_icrs_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume)
             image_icrs_comb_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./len_run_list)
+            image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_volume)
 
         qpb_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         qpb_hdu_list = fits.open(qpb_filename)
@@ -601,11 +642,12 @@ def analyze_one_observation(obsID,detector):
             delta_dec = evt_dec - sky_dec_center
             spectrum_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale)
             spectrum_comb_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list)
-            image_det_qpb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale)
             image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale)
             image_icrs_comb_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list)
             image_icrs_cxb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance)
             spectrum_qpb_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance)
+            image_det_qpb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale)
+            image_det_cxb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance)
 
         spf_filename = '%s/spf_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         spf_hdu_list = fits.open(spf_filename)
@@ -619,7 +661,8 @@ def analyze_one_observation(obsID,detector):
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
             radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
-            radial_acceptance = area_curve[radius].yaxis[0]/area_curve[0].yaxis[0]
+            #radial_acceptance = area_curve[radius].yaxis[0]/area_curve[0].yaxis[0]
+            radial_acceptance = 1.
             spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[0].yaxis[0]
             spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[0].yaxis[0]
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
@@ -632,8 +675,8 @@ def analyze_one_observation(obsID,detector):
             spectrum_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale)
             spectrum_spf_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance)
             spectrum_comb_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list)
-            image_det_spf.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*radial_acceptance)
             image_icrs_spf.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*radial_acceptance)
+            image_det_spf.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*radial_acceptance)
 
     spf_cnt = spectrum_spf.integral()
     spf_radial_cnt = spectrum_spf_radial.integral()
@@ -791,7 +834,7 @@ def get_observation_pointings(run_list):
     for run in run_list:
         obsID = run.split('_')[0]
         detector = run.split('_')[1]
-        input_dir = '/Users/rshang/xmm_analysis/output_plots/'+on_sample+'/ID'+obsID
+        input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/ID'+obsID
         print (f'input_dir = {input_dir}')
         sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[0])
         sci_hdu_list = fits.open(sci_filename)
@@ -858,6 +901,22 @@ radial_comb_sci = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0
 for run in on_run_list:
     obsID = run.split('_')[0]
     detector = run.split('_')[1]
+
+    ref_sky = []
+    ref_det = []
+    mtx_det_2_sky = []
+    mtx_sky_2_det = []
+    for idx_ra in range(0,1):
+        for idx_dec in range(0,1):
+            ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,'ID'+obsID)
+            ref_sky += [ref_sky_local]
+            ref_det += [ref_det_local]
+            mtx_det_2_sky += [mtx_det_2_sky_local]
+            mtx_sky_2_det += [mtx_sky_2_det_local]
+    mask_detx, mask_dety = ConvertSky2Det([mask_ra,mask_dec],ref_det[0],[sky_ra_center,sky_dec_center],mtx_sky_2_det[0])
+    print (f'mask_detx = {mask_detx}')
+    print (f'mask_dety = {mask_dety}')
+
     analyze_one_observation(obsID,detector)
 
 output_dir = '/Users/rshang/xmm_analysis/output_plots/plot_%s/'%(on_sample)
