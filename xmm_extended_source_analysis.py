@@ -62,8 +62,8 @@ on_obsID = sys.argv[2]
 
 diagnostic_plots = True
 #diagnostic_plots = False
-fast_test = True
-#fast_test = False
+#fast_test = True
+fast_test = False
 
 #detector = 'mos1'
 #detector = 'mos2'
@@ -336,7 +336,7 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
 
         if evt_pattern>4: continue
         if 'sp-free' in evt_filter:
-            if evt_pattern!=2: continue
+            if evt_pattern!=2 and evt_pattern!=4: continue
 
         if 'source' in evt_filter:
             if abs(evt_detx)>source_radius: continue
@@ -425,7 +425,7 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
         my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
         my_table.header['REF_RA'] = ref_sky[0][0]
         my_table.header['REF_DEC'] = ref_sky[0][1]
-        my_table.header['obs_duration'] = obs_duration
+        my_table.header['EXPOSURE'] = obs_duration
         my_table.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), overwrite=True)
         #fits.writeto('%s/sci_events_%s_ccd%s.fits'%(output_dir,detector,ccd_id), my_table, overwrite=True)
 
@@ -482,8 +482,8 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
         sp_free_data = 0.
         sp_free_qpb = 0.
         for idx in range(0,len(data_pattern[ch].xaxis)):
-            #if idx!=2 and idx!=4: continue
-            if idx!=2: continue
+            if idx!=2 and idx!=4: continue
+            #if idx!=2: continue
             sp_free_data += data_pattern[ch].yaxis[idx]
             sp_free_qpb  += qpb_pattern[ch].yaxis[idx]
         if sp_free_qpb==0.:
@@ -704,33 +704,118 @@ def fit_pattern(energy_range,data_pattern,xray_pattern,spf_pattern,qpb_pattern):
     
 
     
-def make_timecut_mask(lightcurve_sci,lightcurve_cor,lightcurve_qpb,lightcurve_sci_fov_mask):
+def make_timecut_mask(lightcurve_sci,lightcurve_ctl,lightcurve_sci_fov_mask):
+
+    print ('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+    prelim_mask_lc = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
+     
+    min_cnt = min(lightcurve_sci.yaxis)
+    max_cnt = max(lightcurve_sci.yaxis)
+    print (f'min_cnt = {min_cnt}, max_cnt = {max_cnt}')
 
     avg_rate_fov = 0.
+    time_window = 0.
     for idx in range(0,len(lightcurve_sci.xaxis)):
+        if lightcurve_sci.yaxis[idx]==0.: continue
         if lightcurve_sci_fov_mask.yaxis[idx]==1: continue
         avg_rate_fov += (lightcurve_sci.yaxis[idx])
-    avg_rate_fov = avg_rate_fov/float(len(lightcurve_sci.xaxis))
+        time_window += 1.
+    avg_rate_fov = avg_rate_fov/time_window
 
-    avg_rate_cor = 0.
-    for idx in range(0,len(lightcurve_cor.xaxis)):
-        if lightcurve_sci_fov_mask.yaxis[idx]==1: continue
-        avg_rate_cor += (lightcurve_cor.yaxis[idx])
-    avg_rate_cor = avg_rate_cor/float(len(lightcurve_cor.xaxis))
+    print (f'before prelim timecut, avg_rate_fov = {avg_rate_fov}')
 
-    rms_rate_cor = 0.
-    for idx in range(0,len(lightcurve_cor.xaxis)):
+    rms_rate_fov = 0.
+    time_window = 0.
+    for idx in range(0,len(lightcurve_sci.xaxis)):
+        if lightcurve_sci.yaxis[idx]==0.: continue
         if lightcurve_sci_fov_mask.yaxis[idx]==1: continue
-        rms_rate_cor += pow((lightcurve_cor.yaxis[idx])-avg_rate_cor,2)
-    rms_rate_cor = pow(rms_rate_cor/float(len(lightcurve_cor.xaxis)),0.5)
-    rms_rate_cor = rms_rate_cor*avg_rate_fov/avg_rate_cor
+        rms_rate_fov += pow((lightcurve_sci.yaxis[idx])-avg_rate_fov,2)
+        time_window += 1.
+    rms_rate_fov = pow(rms_rate_fov/time_window,0.5)
+
+    print (f'before prelim timecut, rms_rate_fov = {rms_rate_fov}')
+    init_rms_rate_fov = rms_rate_fov
 
     for idx in range(0,len(lightcurve_sci.xaxis)):
+        if lightcurve_sci.yaxis[idx]==0.: continue
         sci_rate = (lightcurve_sci.yaxis[idx])
-        if (sci_rate-avg_rate_fov)/rms_rate_cor>3.0:
+        if (sci_rate-avg_rate_fov)/rms_rate_fov>0.:
+            prelim_mask_lc.yaxis[idx] = 1.
+
+    timecut_frac = 0.
+    timecut_cnt = 0.
+    timeall_cnt = 0.
+    for idx in range(0,len(lightcurve_sci.xaxis)):
+        if lightcurve_sci.yaxis[idx]==0.: continue
+        timeall_cnt += 1.
+        if prelim_mask_lc.yaxis[idx]==1.:
+            timecut_cnt += 1.
+    timecut_frac = timecut_cnt/timeall_cnt
+    print (f'prelim timecut_frac = {timecut_frac}')
+
+
+    avg_rate_fov = 0.
+    time_window = 0.
+    for idx in range(0,len(lightcurve_sci.xaxis)):
+        if lightcurve_sci.yaxis[idx]==0.: continue
+        if lightcurve_sci_fov_mask.yaxis[idx]==1: continue
+        if prelim_mask_lc.yaxis[idx]==1: continue
+        avg_rate_fov += (lightcurve_sci.yaxis[idx])
+        time_window += 1.
+    avg_rate_fov = avg_rate_fov/time_window
+
+    print (f'after prelim timecut, avg_rate_fov = {avg_rate_fov}')
+
+    rms_rate_fov = 0.
+    time_window = 0.
+    for idx in range(0,len(lightcurve_sci.xaxis)):
+        if lightcurve_sci.yaxis[idx]==0.: continue
+        if lightcurve_sci_fov_mask.yaxis[idx]==1: continue
+        if prelim_mask_lc.yaxis[idx]==1: continue
+        rms_rate_fov += pow((lightcurve_sci.yaxis[idx])-avg_rate_fov,2)
+        time_window += 1.
+    rms_rate_fov = pow(rms_rate_fov/time_window,0.5)
+
+    print (f'after prelim timecut, rms_rate_fov = {rms_rate_fov}')
+
+
+    avg_rate_ctl = 0.
+    time_window = 0.
+    for idx in range(0,len(lightcurve_ctl.xaxis)):
+        if lightcurve_ctl.yaxis[idx]==0.: continue
+        avg_rate_ctl += (lightcurve_ctl.yaxis[idx])
+        time_window += 1.
+    avg_rate_ctl = avg_rate_ctl/time_window
+    print (f'avg_rate_ctl = {avg_rate_ctl}')
+
+    rms_rate_ctl = 0.
+    time_window = 0.
+    for idx in range(0,len(lightcurve_ctl.xaxis)):
+        if lightcurve_ctl.yaxis[idx]==0.: continue
+        rms_rate_ctl += pow((lightcurve_ctl.yaxis[idx])-avg_rate_ctl,2)
+        time_window += 1.
+    rms_rate_ctl = pow(rms_rate_ctl/time_window,0.5)
+    #rms_rate_ctl = rms_rate_ctl*avg_rate_fov/avg_rate_ctl
+    print (f'rms_rate_ctl = {rms_rate_ctl}')
+
+    for idx in range(0,len(lightcurve_sci.xaxis)):
+        if lightcurve_sci.yaxis[idx]==0.: continue
+        sci_rate = (lightcurve_sci.yaxis[idx])
+        if (sci_rate-(avg_rate_fov+rms_rate_fov))/rms_rate_ctl>2.5:
             lightcurve_sci_fov_mask.yaxis[idx] = 1.
 
-    return lightcurve_sci_fov_mask
+    timecut_frac = 0.
+    timecut_cnt = 0.
+    timeall_cnt = 0.
+    for idx in range(0,len(lightcurve_sci.xaxis)):
+        timeall_cnt += 1.
+        if lightcurve_sci_fov_mask.yaxis[idx]==1.:
+            timecut_cnt += 1.
+    timecut_frac = timecut_cnt/timeall_cnt
+    print (f'timecut_frac = {timecut_frac}')
+
+    print ('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+    return init_rms_rate_fov
 
 
 start_time = time.time()
@@ -886,13 +971,27 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     print ('prepare on sample time cuts')
     
-    output_all_nsp = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
-    output_fwc_nsp = read_event_file(on_fwc_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
     output_all_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_all_cor = read_event_file(on_sci_cor_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,on_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+
+    on_duration_all_fov = output_all_fov[0]
+    on_evt_count_all_fov = output_all_fov[1]
+    on_lightcurve_all_fov = output_all_fov[2]
+    on_pattern_all_fov = output_all_fov[3]
+    on_spectrum_all_fov = output_all_fov[4]
+    on_detx_all_fov = output_all_fov[5]
+    on_image_all_fov = output_all_fov[6]
     
+    image_det_mask = MyArray2D()
+    find_point_sources(on_image_all_fov[0],image_det_mask)
+    find_point_sources(on_image_all_fov[0],image_det_mask)
+
+    output_all_nsp = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='sp-free')
+    output_fwc_nsp = read_event_file(on_fwc_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='sp-free')
+    output_all_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='')
+    output_fwc_fov = read_event_file(on_fwc_fov_evt_filename,on_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='')
+    output_all_cor = read_event_file(on_sci_cor_evt_filename,on_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='')
+    output_fwc_cor = read_event_file(on_fwc_cor_evt_filename,on_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='')
+
     on_duration_all_nsp = output_all_nsp[0]
     on_evt_count_all_nsp = output_all_nsp[1]
     on_lightcurve_all_nsp = output_all_nsp[2]
@@ -943,6 +1042,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
 
     area_pix_frac_fwc_fov = on_image_fwc_fov[0].integral()
     area_pix_frac_fwc_cor = on_image_fwc_cor[0].integral()
+
+    nsp_2_fov_ratio = on_image_fwc_fov[0].integral()/on_image_fwc_nsp[0].integral()
     
     time_pix_frac_all_fov = on_lightcurve_all_fov.get_pixel_fraction()
     time_expo_all_fov = on_duration_all_fov*time_pix_frac_all_fov
@@ -958,14 +1059,21 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     fwc_2_sci_ratio = 0.45
     print ('Before timecut, ON data fwc_2_sci_ratio = %s'%(fwc_2_sci_ratio))
 
+    on_lightcurve_all_nsp.scale(nsp_2_fov_ratio)
     on_lightcurve_all_cor.scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
     on_lightcurve_fwc_fov.scale(fwc_2_sci_ratio)
     on_lightcurve_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
     on_lightcurve_fwc_nsp.scale(fwc_2_sci_ratio)
 
     on_mask_lc = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-    make_timecut_mask(on_lightcurve_all_fov,on_lightcurve_all_cor,on_lightcurve_fwc_cor,on_mask_lc) 
-    make_timecut_mask(on_lightcurve_all_fov,on_lightcurve_all_cor,on_lightcurve_fwc_cor,on_mask_lc) 
+    rms_rate = 1e10
+    still_need_timecut = True
+    while still_need_timecut:
+        init_rms_rate = make_timecut_mask(on_lightcurve_all_fov,on_lightcurve_all_nsp,on_mask_lc) 
+        if init_rms_rate<rms_rate:
+            rms_rate = init_rms_rate
+        else:
+            still_need_timecut = False
 
     output_sci_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-veto',energy_range=energy_range)
     output_spf_fov = read_event_file(on_sci_fov_evt_filename,on_arf_filename,mask_lc=on_mask_lc,mask_map=None,evt_filter='sp-select',energy_range=energy_range)
@@ -1002,12 +1110,26 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     print ('use off sample: %s'%(off_sci_fov_evt_filename))
     print ('prepare off sample time cuts')
     
-    output_all_nsp = read_event_file(off_sci_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
-    output_fwc_nsp = read_event_file(off_fwc_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='sp-free')
     output_all_fov = read_event_file(off_sci_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_all_cor = read_event_file(off_sci_cor_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
-    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_arf_filename,mask_lc=None,mask_map=None,evt_filter='')
+
+    off_duration_all_fov = output_all_fov[0]
+    off_evt_count_all_fov = output_all_fov[1]
+    off_lightcurve_all_fov = output_all_fov[2]
+    off_pattern_all_fov = output_all_fov[3]
+    off_spectrum_all_fov = output_all_fov[4]
+    off_detx_all_fov = output_all_fov[5]
+    off_image_all_fov = output_all_fov[6]
+    
+    image_det_mask = MyArray2D()
+    find_point_sources(off_image_all_fov[0],image_det_mask)
+    find_point_sources(off_image_all_fov[0],image_det_mask)
+
+    output_all_nsp = read_event_file(off_sci_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='sp-free')
+    output_fwc_nsp = read_event_file(off_fwc_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='sp-free')
+    output_all_fov = read_event_file(off_sci_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='')
+    output_fwc_fov = read_event_file(off_fwc_fov_evt_filename,off_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='')
+    output_all_cor = read_event_file(off_sci_cor_evt_filename,off_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='')
+    output_fwc_cor = read_event_file(off_fwc_cor_evt_filename,off_arf_filename,mask_lc=None,mask_map=image_det_mask,evt_filter='')
     
     off_duration_all_nsp = output_all_nsp[0]
     off_evt_count_all_nsp = output_all_nsp[1]
@@ -1059,6 +1181,8 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     
     area_pix_frac_fwc_fov = off_image_fwc_fov[0].integral()
     area_pix_frac_fwc_cor = off_image_fwc_cor[0].integral()
+
+    nsp_2_fov_ratio = off_image_fwc_fov[0].integral()/off_image_fwc_nsp[0].integral()
     
     time_pix_frac_all_fov = off_lightcurve_all_fov.get_pixel_fraction()
     time_expo_all_fov = off_duration_all_fov*time_pix_frac_all_fov
@@ -1074,14 +1198,21 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     fwc_2_sci_ratio = 0.45
     print ('Before timecut, OFF data fwc_2_sci_ratio = %s'%(fwc_2_sci_ratio))
 
+    off_lightcurve_all_nsp.scale(nsp_2_fov_ratio)
     off_lightcurve_all_cor.scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
     off_lightcurve_fwc_fov.scale(fwc_2_sci_ratio)
     off_lightcurve_fwc_cor.scale(fwc_2_sci_ratio*area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
     off_lightcurve_fwc_nsp.scale(fwc_2_sci_ratio)
 
     off_mask_lc = MyArray1D(bin_start=t_low,bin_end=t_high,pixel_scale=t_scale)
-    make_timecut_mask(off_lightcurve_all_fov,off_lightcurve_all_cor,off_lightcurve_fwc_cor,off_mask_lc) 
-    make_timecut_mask(off_lightcurve_all_fov,off_lightcurve_all_cor,off_lightcurve_fwc_cor,off_mask_lc) 
+    rms_rate = 1e10
+    still_need_timecut = True
+    while still_need_timecut:
+        init_rms_rate = make_timecut_mask(off_lightcurve_all_fov,off_lightcurve_all_nsp,off_mask_lc) 
+        if init_rms_rate<rms_rate:
+            rms_rate = init_rms_rate
+        else:
+            still_need_timecut = False
 
     if diagnostic_plots:
         fig.clf()

@@ -19,10 +19,23 @@ on_sample = sys.argv[1]
 on_obsID = sys.argv[2]
 job = sys.argv[3]
 
-mask_ra = 350.8075
-mask_dec = 58.8072
-mask_inner_radius = 0.10
-mask_outer_radius = 0.15
+# Cas A
+#mask_ra = 350.8075+0.03
+#mask_dec = 58.8072+0.03
+#mask_inner_radius = 0.10
+#mask_outer_radius = 0.20
+
+# 3HWC J1928
+#mask_ra = 292.1499583
+#mask_dec = 17.9011111
+#mask_inner_radius = 0.05
+#mask_outer_radius = 0.5
+
+# 3HWC J1930
+mask_ra = 292.6258333
+mask_dec = 18.8708889
+mask_inner_radius = 0.035
+mask_outer_radius = 0.08
 
 mask_detx = 0.
 mask_dety = 0.
@@ -32,8 +45,8 @@ mask_outer_detr = mask_outer_radius/(0.05/(60.*60.))
 #measure_cxb = True
 measure_cxb = False
 
-#include_cxb = True
-include_cxb = False
+include_cxb = True
+#include_cxb = False
 
 # background study
 #find_extended_src = True
@@ -343,11 +356,14 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
     use_this_data = True
     distance = 0.
     exposure = 0.
+    qpb_frac = 0.
     for line in cxb_file:
         if '#' in line:
             line_split = line.split(';')
             line_obsid = line_split[1]
             line_detector = line_split[2]
+            line_spf_frac = line_split[4].strip(' SPF')
+            qpb_frac = 1./(float(line_spf_frac)+1.)
             line_exposure = line_split[5].strip('\n')
             exposure = float(line_exposure)
             line_coord = line_split[3]
@@ -357,8 +373,11 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
             if not obsID=='':
                 if not obsID in line_obsid:
                     use_this_data = False
-            if not detector in line_detector:
-                use_this_data = False
+            else:
+                if distance<0.3:
+                    use_this_data = False
+            #if not detector in line_detector:
+            #    use_this_data = False
             continue
         if not use_this_data: 
             use_this_data = True
@@ -370,7 +389,7 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
             cxb_measurement_single += [float(line_split[entry])]
         cxb_measurement += [cxb_measurement_single]
         #cxb_measurement_weight += [1./distance]
-        cxb_measurement_weight += [pow(exposure,0.5)/distance]
+        cxb_measurement_weight += [pow(exposure,0.5)*qpb_frac]
     cxb_file.close()
 
     if not obsID=='':
@@ -490,15 +509,16 @@ def analyze_one_observation(obsID,detector):
         fig.savefig("%s/gravity_lofreq_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
         axbig.remove()
 
-    for idx_x in range(0,len(image_det_mask.xaxis)):
-        for idx_y in range(0,len(image_det_mask.yaxis)):
-            pix_detx = image_det_mask.xaxis[idx_x]
-            pix_dety = image_det_mask.yaxis[idx_y]
-            distance = pow(pow(pix_detx-mask_detx,2)+pow(pix_dety-mask_dety,2),0.5)
-            if distance<mask_inner_detr:
-                image_det_mask.zaxis[idx_x,idx_y] = 1.
-            if distance>mask_outer_detr:
-                image_det_mask.zaxis[idx_x,idx_y] = 1.
+    if abs(mask_detx)<20000 and abs(mask_dety)<20000: 
+        for idx_x in range(0,len(image_det_mask.xaxis)):
+            for idx_y in range(0,len(image_det_mask.yaxis)):
+                pix_detx = image_det_mask.xaxis[idx_x]
+                pix_dety = image_det_mask.yaxis[idx_y]
+                distance = pow(pow(pix_detx-mask_detx,2)+pow(pix_dety-mask_dety,2),0.5)
+                if distance<mask_inner_detr:
+                    image_det_mask.zaxis[idx_x,idx_y] = 1.
+                if distance>mask_outer_detr:
+                    image_det_mask.zaxis[idx_x,idx_y] = 1.
 
     fig.clf()
     axbig = fig.add_subplot()
@@ -591,7 +611,7 @@ def analyze_one_observation(obsID,detector):
 
         sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         sci_hdu_list = fits.open(sci_filename)
-        exposure = sci_hdu_list[1].header['obs_duration']
+        exposure = sci_hdu_list[1].header['EXPOSURE']
         print (f'exposure = {exposure}')
         sci_table = Table.read(sci_filename, hdu=1)
         for entry in range(0,len(sci_table)):
@@ -694,7 +714,7 @@ def analyze_one_observation(obsID,detector):
 
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[0])
     sci_hdu_list = fits.open(sci_filename)
-    exposure = sci_hdu_list[1].header['obs_duration']
+    exposure = sci_hdu_list[1].header['EXPOSURE']
 
     cxb_spectrum_measurement_tmp = []
     for ch in range(0,len(cxb_energy_array)-1):
@@ -726,6 +746,7 @@ def analyze_one_observation(obsID,detector):
         get_cxb_spectrum(cxb_output_dir,spectrum_cxb,sky_l_center,sky_b_center,detector,obsID=obsID)
 
     elif include_cxb:
+        #get_cxb_spectrum(cxb_output_dir,spectrum_cxb,sky_l_center,sky_b_center,detector,obsID=obsID)
         get_cxb_spectrum(cxb_output_dir,spectrum_cxb,sky_l_center,sky_b_center,detector)
         spectrum_comb_cxb.add(spectrum_cxb,factor=1./len_run_list)
 
@@ -923,6 +944,12 @@ output_dir = '/Users/rshang/xmm_analysis/output_plots/plot_%s/'%(on_sample)
 common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_sci,"%s/image_icrs_job%s_%s.png"%(output_dir,job,obsID))
 common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_sci,"%s/image_icrs_log_job%s_%s.png"%(output_dir,job,obsID),log_scale=True)
 
+image_icrs_comb_xry.add(image_icrs_comb_sci)
+image_icrs_comb_xry.add(image_icrs_comb_qpb,factor=-1.)
+image_icrs_comb_xry.add(image_icrs_comb_spf,factor=-1.)
+image_icrs_comb_xry.add(image_icrs_comb_cxb,factor=-1.)
+common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_xry,"%s/image_icrs_xry_log_job%s_%s.png"%(output_dir,job,obsID))
+
 plot_data = spectrum_comb_sci
 plot_bkg = []
 plot_color = []
@@ -958,5 +985,5 @@ plot_bkg += [radial_comb_qpb]
 plot_color += [color_list[0]]
 plot_label += ['QPB']
 save_name = "%s/radial_comb_job%s_%s.png"%(output_dir,job,obsID)
-draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Angular distance [deg]','Photons /cm2/s/sr/keV',save_name,False)
+draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Angular distance [deg]','Photons /cm2/s/sr/keV',save_name,True)
     

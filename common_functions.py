@@ -605,9 +605,9 @@ def DrawSkyMap(fig,map_color,image_data,save_name,log_scale=False):
     target_xxx_name = []
     target_xxx_ra = []
     target_xxx_dec = []
-    target_xxx_name += ['CXO1928']
-    target_xxx_ra += [292.05]
-    target_xxx_dec += [17.78]
+    #target_xxx_name += ['CXO1928']
+    #target_xxx_ra += [292.05]
+    #target_xxx_dec += [17.78]
 
     star_range = 0.8*(xmax-xmin)/2.
     source_ra = (xmax+xmin)/2.
