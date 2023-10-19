@@ -10,7 +10,7 @@ pattern_high = 6
 pattern_scale = 1
 ch_low = 200
 ch_high = 12000
-ch_scale = 100
+ch_scale = 50
 t_low = 0
 t_high = 1
 t_scale = 0.01
@@ -210,6 +210,12 @@ class MyArray1D:
         for entry in range(0,len(self.yaxis)):
             self.yerr[entry] = pow(max(self.yaxis[entry],1.),0.5)
             self.xerr[entry] = 0.5*(self.xaxis[1]-self.xaxis[0])
+    def get_bin(self, value_x):
+        key_idx_x = 0
+        for idx_x in range(0,len(self.xaxis)-1):
+            if value_x>=self.xaxis[idx_x]:
+                key_idx_x = idx_x
+        return key_idx_x
     def get_bin_content(self, value_x):
         key_idx_x = 0
         for idx_x in range(0,len(self.xaxis)-1):

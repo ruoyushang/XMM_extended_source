@@ -422,7 +422,7 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
         #col_b = fits.Column(name='GalB', array=evt_b_list, format='D')
         col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
         #my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_l,col_b,col_pi],name='EVENT')
-        my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
+        my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENTS')
         my_table.header['REF_RA'] = ref_sky[0][0]
         my_table.header['REF_DEC'] = ref_sky[0][1]
         my_table.header['EXPOSURE'] = obs_duration
@@ -1851,7 +1851,7 @@ for ccd in range(0,len(ana_ccd_bins)):
     #col_b = fits.Column(name='GalB', array=evt_b_list, format='D')
     col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
     #my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_l,col_b,col_pi],name='EVENT')
-    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
+    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENTS')
     my_table.writeto('%s/spf_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     prob_qpb_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
@@ -1894,7 +1894,7 @@ for ccd in range(0,len(ana_ccd_bins)):
     #col_b = fits.Column(name='GalB', array=evt_b_list, format='D')
     col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
     #my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_l,col_b,col_pi],name='EVENT')
-    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENT')
+    my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENTS')
     my_table.writeto('%s/qpb_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     sci_spectrum_sum.add(ana_output_spectrum[0])
