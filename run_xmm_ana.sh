@@ -57,32 +57,32 @@
 #obs_ID_list+=('0553640101')
 #obs_ID_list+=('0506430101')
 
-#source_name='MGRO_J2019_p37'
-#obs_ID_list=()
-#obs_ID_list+=('0212481201')
-#obs_ID_list+=('0744640101')
-#obs_ID_list+=('0692810501')
-#obs_ID_list+=('0670480501')
-#obs_ID_list+=('0652770101')
-#obs_ID_list+=('0782961201')
-#obs_ID_list+=('0795712301')
-#obs_ID_list+=('0304000201')
-#obs_ID_list+=('0510011401')
-#obs_ID_list+=('0670480401')
-#obs_ID_list+=('0880030501')
-#obs_ID_list+=('0206240801')
-#obs_ID_list+=('0600030201')
-#obs_ID_list+=('0552350101')
-#obs_ID_list+=('0206240401')
-#obs_ID_list+=('0692810301')
-#obs_ID_list+=('0206240201')
-#obs_ID_list+=('0206240701')
-#obs_ID_list+=('0674050101')
-#obs_ID_list+=('0692810401')
-#obs_ID_list+=('0692810601')
-#obs_ID_list+=('0723310201')
-#obs_ID_list+=('0721570101')
-#obs_ID_list+=('0720600101')
+source_name='MGRO_J2019_p37'
+obs_ID_list=()
+obs_ID_list+=('0212481201')
+obs_ID_list+=('0744640101')
+obs_ID_list+=('0692810501')
+obs_ID_list+=('0670480501')
+obs_ID_list+=('0652770101')
+obs_ID_list+=('0782961201')
+obs_ID_list+=('0795712301')
+obs_ID_list+=('0304000201')
+obs_ID_list+=('0510011401')
+obs_ID_list+=('0670480401')
+obs_ID_list+=('0880030501')
+obs_ID_list+=('0206240801')
+obs_ID_list+=('0600030201')
+obs_ID_list+=('0552350101')
+obs_ID_list+=('0206240401')
+obs_ID_list+=('0692810301')
+obs_ID_list+=('0206240201')
+obs_ID_list+=('0206240701')
+obs_ID_list+=('0674050101')
+obs_ID_list+=('0692810401')
+obs_ID_list+=('0692810601')
+obs_ID_list+=('0723310201')
+obs_ID_list+=('0721570101')
+obs_ID_list+=('0720600101')
 #
 #source_name='PSR_J1928_p1746'
 #obs_ID_list=()
@@ -99,20 +99,20 @@
 #obs_ID_list+=('0830192001')
 #obs_ID_list+=('0902120101')
 
-source_name='Cas_A'
-obs_ID_list=()
-obs_ID_list+=('0672960101')
-obs_ID_list+=('0412180101')
-obs_ID_list+=('0400210101')
-obs_ID_list+=('0820840301')
-obs_ID_list+=('0880580601')
-obs_ID_list+=('0782961401')
-obs_ID_list+=('0820840401')
-obs_ID_list+=('0057540101')
-obs_ID_list+=('0861170401')
-obs_ID_list+=('0400600101')
-obs_ID_list+=('0820840501')
-obs_ID_list+=('0149610301')
+#source_name='Cas_A'
+#obs_ID_list=()
+#obs_ID_list+=('0672960101')
+#obs_ID_list+=('0412180101')
+#obs_ID_list+=('0400210101')
+#obs_ID_list+=('0820840301')
+#obs_ID_list+=('0880580601')
+#obs_ID_list+=('0782961401')
+#obs_ID_list+=('0820840401')
+#obs_ID_list+=('0057540101')
+#obs_ID_list+=('0861170401')
+#obs_ID_list+=('0400600101')
+#obs_ID_list+=('0820840501')
+#obs_ID_list+=('0149610301')
 
 for i in ${obs_ID_list[@]}
 do
@@ -132,9 +132,9 @@ do
     #sh run_rename.sh $1 $2
     
     #sh run_filtering.sh
-    #sh run_skyref.sh
-    #sh run_esky2det.sh
-    sh run_response.sh
+    sh run_skyref.sh
+    sh run_esky2det.sh
+    #sh run_response.sh
     #
     #sh run_edet2sky.sh
 
