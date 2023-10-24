@@ -52,21 +52,6 @@
 #ID_list+=('0081340201')
 #ID_list+=('0111281001')
 
-source_name='PSR_J1928_p1746'
-ID_list=()
-ID_list+=('0764820101')
-ID_list+=('0605370101')
-ID_list+=('0742710301')
-ID_list+=('0503740101')
-ID_list+=('0554690101')
-ID_list+=('0871190201')
-ID_list+=('0504230201')
-ID_list+=('0853980101')
-ID_list+=('0841190101')
-ID_list+=('0406730101')
-ID_list+=('0830192001')
-ID_list+=('0902120101')
-
 #source_name='MGRO_J1908_p06'
 #ID_list=()
 #ID_list+=('0553640701')
@@ -115,13 +100,43 @@ ID_list+=('0902120101')
 #ID_list+=('0721570101')
 #ID_list+=('0720600101')
 
-mkdir /Users/rshang/xmm_analysis/output_plots/$source_name
+#source_name='PSR_J1928_p1746'
+#ID_list=()
+#ID_list+=('0764820101')
+#ID_list+=('0605370101')
+#ID_list+=('0742710301')
+#ID_list+=('0503740101')
+#ID_list+=('0554690101')
+#ID_list+=('0871190201')
+#ID_list+=('0504230201')
+#ID_list+=('0853980101')
+#ID_list+=('0841190101')
+#ID_list+=('0406730101')
+#ID_list+=('0830192001')
+#ID_list+=('0902120101')
+
+source_name='Cas_A'
+ID_list=()
+ID_list+=('0412180101')
+ID_list+=('0400210101')
+ID_list+=('0672960101')
+ID_list+=('0820840301')
+ID_list+=('0880580601')
+ID_list+=('0782961401')
+ID_list+=('0820840401')
+ID_list+=('0057540101')
+ID_list+=('0861170401')
+ID_list+=('0400600101')
+ID_list+=('0820840501')
+ID_list+=('0149610301')
+
+mkdir /Users/rshang/xmm_analysis/output_extended_analysis/$source_name
 for i in ${ID_list[@]}
 do
     obs_ID='ID'$i
-    rm -r /Users/rshang/xmm_analysis/output_plots/$source_name/$obs_ID
-    mkdir /Users/rshang/xmm_analysis/output_plots/$source_name/$obs_ID
-    outdir=/Users/rshang/xmm_analysis/output_plots/$source_name/$obs_ID
+    rm -r /Users/rshang/xmm_analysis/output_extended_analysis/$source_name/$obs_ID
+    mkdir /Users/rshang/xmm_analysis/output_extended_analysis/$source_name/$obs_ID
+    outdir=/Users/rshang/xmm_analysis/output_extended_analysis/$source_name/$obs_ID
     (python3 xmm_extended_source_analysis.py $source_name $obs_ID 'mos1' 'fov') 2>&1 | tee $outdir/mos1_output.log 
     (python3 xmm_extended_source_analysis.py $source_name $obs_ID 'mos2' 'fov') 2>&1 | tee $outdir/mos2_output.log
     #python3 xmm_extended_source_analysis.py $source_name $obs_ID 'mos1' 'fov' 

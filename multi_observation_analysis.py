@@ -21,14 +21,18 @@ on_obsID = sys.argv[2]
 job = sys.argv[3]
 
 # Cas A
-mask_ra = 350.8075+0.03
-mask_dec = 58.8072+0.03
-mask_inner_radius = 0.0
-mask_outer_radius = 0.1
+mask_ra = 350.8075+0.05
+mask_dec = 58.8072+0.01
+#mask_inner_radius = 0.0
+#mask_outer_radius = 0.01
+#mask_inner_radius = 0.0
+#mask_outer_radius = 0.07
+#mask_inner_radius = 0.0
+#mask_outer_radius = 0.5
 #mask_inner_radius = 0.10
 #mask_outer_radius = 0.20
-#mask_inner_radius = 0.20
-#mask_outer_radius = 0.40
+mask_inner_radius = 0.20
+mask_outer_radius = 0.40
 
 # 3HWC J1928
 #mask_ra = 292.1499583
@@ -78,11 +82,14 @@ write_xspec_output = True
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 
-energy_cut_lower = 1000
-#energy_cut_lower = 2000
-#energy_cut_lower = 4000
-#energy_cut_upper = 4000
+energy_cut_lower = 2000
 energy_cut_upper = 12000
+#energy_cut_lower = 5200
+#energy_cut_upper = 6200
+#energy_cut_lower = 7000
+#energy_cut_upper = 9000
+#energy_cut_lower = 6200
+#energy_cut_upper = 7000
 
 on_exposure = 0.
 total_spectral_volume = 0.
@@ -213,9 +220,9 @@ def MakeRadialProjection(image_map_xry, profile_r):
         pix_integral_xry = 0.
         pix_count = 0.
         for idx_x in range(0,len(image_map_xry.xaxis)):
-            delta_x = image_map_xry.xaxis[idx_x] - sky_ra_center
+            delta_x = image_map_xry.xaxis[idx_x] - mask_ra
             for idx_y in range(0,len(image_map_xry.yaxis)):
-                delta_y = image_map_xry.yaxis[idx_y] - sky_dec_center
+                delta_y = image_map_xry.yaxis[idx_y] - mask_dec
                 distance = pow(delta_x*delta_x+delta_y*delta_y,0.5)
                 if distance<pix_z_lo: continue
                 if distance>=pix_z_hi: continue
@@ -377,6 +384,8 @@ def draw_stacked_histogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,y
     if log_scale:
         axbig.set_yscale('log')
         axbig.set_ylim(bottom=0.5*avg_qpb)
+    if 'spectrum' in plot_name:
+        axbig.set_xscale('log')
     axbig.set_xlabel(xlabel)
     axbig.set_ylabel(ylabel)
     axbig.legend(loc='best')
@@ -579,13 +588,13 @@ def analyze_one_observation(obsID,detector):
     image_det_spf = MyArray2D(pixel_scale=detx_scale)
     image_det_cxb = MyArray2D(pixel_scale=detx_scale)
     image_det_xry = MyArray2D(pixel_scale=detx_scale)
-    spectrum_sci = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-    spectrum_qpb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-    spectrum_qpb_radial = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-    spectrum_spf = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-    spectrum_spf_radial = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-    spectrum_cxb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-    spectrum_xry = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+    spectrum_sci = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+    spectrum_qpb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+    spectrum_qpb_radial = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+    spectrum_spf = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+    spectrum_spf_radial = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+    spectrum_cxb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+    spectrum_xry = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
     image_icrs_sci = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
     image_icrs_xry = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
     image_icrs_qpb = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
@@ -595,7 +604,6 @@ def analyze_one_observation(obsID,detector):
     radial_qpb = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
     radial_spf = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
     radial_cxb = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
-    radial_sci = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
 
     area_curve = []
     area_curve += [MyArray1D(bin_start=2000,bin_end=12000,pixel_scale=2000)]
@@ -957,16 +965,16 @@ image_icrs_comb_xry = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_siz
 image_icrs_comb_qpb = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
 image_icrs_comb_spf = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
 image_icrs_comb_cxb = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
-spectrum_comb_sci = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-spectrum_comb_qpb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-spectrum_comb_spf = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-spectrum_comb_cxb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-spectrum_comb_xry = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-spectrum_comb_raw_sci = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-spectrum_comb_raw_qpb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-spectrum_comb_raw_spf = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-spectrum_comb_raw_cxb = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
-spectrum_comb_raw_xry = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
+spectrum_comb_sci = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_qpb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_spf = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_cxb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_xry = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_raw_sci = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_raw_qpb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_raw_spf = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_raw_cxb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_raw_xry = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 radial_comb_sci = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
 radial_comb_qpb = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
 radial_comb_spf = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
@@ -1094,7 +1102,9 @@ if write_xspec_output:
     mytable = Table.read(input_filename, hdu=1)
     original_delta_energy = spectrum_comb_raw_xry.xaxis[1]-spectrum_comb_raw_xry.xaxis[0]
     rebin_delta_energy = spectrum_rebin_raw_xry.xaxis[1]-spectrum_rebin_raw_xry.xaxis[0]
-    for ch in range(0,len(spectrum_rebin_raw_xry.xaxis)):
+    rebin_energy = spectrum_comb_raw_xry.xaxis[0]
+    ch_start = spectrum_rebin_raw_xry.get_bin(rebin_energy)
+    for ch in range(ch_start,len(spectrum_rebin_raw_xry.xaxis)):
         ch_energy = spectrum_rebin_raw_xry.xaxis[ch]
         ch_rebin = spectrum_comb_raw_xry.get_bin(ch_energy)
         spectrum_rebin_raw_xry.yaxis[ch] = spectrum_comb_raw_xry.yaxis[ch_rebin]*rebin_delta_energy/original_delta_energy
@@ -1134,84 +1144,4 @@ if write_xspec_output:
     shutil.copyfile(input_filename, output_filename)
 
 
-    #input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
-    #hdu_list = fits.open(input_filename)
-    #mytable = Table.read(input_filename, hdu=1)
-    #original_nbins = len(mytable)
-    #spectrum_arf_energy_lo = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    #spectrum_arf_energy_hi = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    #spectrum_arf_area = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    #for entry in range(0,len(mytable)):
-    #    spectrum_arf_energy_lo.yaxis[entry] = mytable[entry]['ENERG_LO']
-    #    spectrum_arf_energy_hi.yaxis[entry] = mytable[entry]['ENERG_HI']
-    #    spectrum_arf_area.yaxis[entry] = mytable[entry]['SPECRESP']
-    #list_energy_lo = []
-    #list_energy_hi = []
-    #list_area = []
-    #for ch in range(0,len(spectrum_comb_raw_xry.xaxis)):
-    #    energy = spectrum_comb_raw_xry.xaxis[ch]
-    #    ch_rebin = spectrum_arf_area.get_bin(energy)
-    #    energy_lo = spectrum_arf_energy_lo.yaxis[ch_rebin]
-    #    energy_hi = spectrum_arf_energy_hi.yaxis[ch_rebin]
-    #    area = spectrum_arf_area.yaxis[ch_rebin]
-    #    list_energy_lo += [energy_lo]
-    #    list_energy_hi += [energy_hi]
-    #    list_area += [2.*area] # MOS1+MOS2
-    #col_energy_lo = fits.Column(name='ENERG_LO', array=list_energy_lo, format='E')
-    #col_energy_hi = fits.Column(name='ENERG_HI', array=list_energy_hi, format='E')
-    #col_area = fits.Column(name='SPECRESP', array=list_area, format='E')
-    #my_header = hdu_list[1].header
-    #my_table = fits.BinTableHDU.from_columns([col_energy_lo,col_energy_hi,col_area],name='SPECRESP',header=my_header)
-    #hdul = fits.HDUList([hdu_list[0], my_table])
-    #hdul.writeto('%s/table_arf_%s.fits'%(output_dir,obsID), overwrite=True)
-    #
-    #
-    #input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-rmf.fits'
-    #hdu_list = fits.open(input_filename)
-    #mytable = Table.read(input_filename, hdu=1)
-    #original_nbins = len(mytable)
-    #spectrum_rmf_energy_lo = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    #spectrum_rmf_energy_hi = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    #spectrum_rmf_ngrp = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    #spectrum_rmf_fchan = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    #spectrum_rmf_nchan = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    #spectrum_rmf_matrix = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    #for entry in range(0,len(mytable)):
-    #    spectrum_rmf_energy_lo.yaxis[entry] = mytable[entry]['ENERG_LO']
-    #    spectrum_rmf_energy_hi.yaxis[entry] = mytable[entry]['ENERG_HI']
-    #    spectrum_rmf_ngrp.yaxis[entry] = mytable[entry]['N_GRP']
-    #    spectrum_rmf_fchan.yaxis[entry] = mytable[entry]['F_CHAN']
-    #    spectrum_rmf_nchan.yaxis[entry] = mytable[entry]['N_CHAN']
-    #    spectrum_rmf_matrix.yaxis[entry] = mytable[entry]['MATRIX']
-    #list_energy_lo = []
-    #list_energy_hi = []
-    #list_ngrp = []
-    #list_fchan = []
-    #list_nchan = []
-    #list_matrix = []
-    #for ch in range(0,len(spectrum_comb_raw_xry.xaxis)):
-    #    energy = spectrum_comb_raw_xry.xaxis[ch]
-    #    ch_rebin = spectrum_rmf_matrix.get_bin(energy)
-    #    energy_lo = spectrum_rmf_energy_lo.yaxis[ch_rebin]
-    #    energy_hi = spectrum_rmf_energy_hi.yaxis[ch_rebin]
-    #    ngrp = spectrum_rmf_ngrp.yaxis[ch_rebin]
-    #    fchan = spectrum_rmf_fchan.yaxis[ch_rebin]
-    #    nchan = spectrum_rmf_nchan.yaxis[ch_rebin]
-    #    matrix = spectrum_rmf_matrix.yaxis[ch_rebin]
-    #    list_energy_lo += [energy_lo]
-    #    list_energy_hi += [energy_hi]
-    #    list_ngrp += [ngrp]
-    #    list_fchan += [fchan]
-    #    list_nchan += [nchan]
-    #    list_matrix += [matrix]
-    #col_energy_lo = fits.Column(name='ENERG_LO', array=list_energy_lo, format='E')
-    #col_energy_hi = fits.Column(name='ENERG_HI', array=list_energy_hi, format='E')
-    #col_ngrp = fits.Column(name='N_GRP', array=list_ngrp, format='I')
-    #col_fchan = fits.Column(name='F_CHAN', array=list_fchan, format='I')
-    #col_nchan = fits.Column(name='N_CHAN', array=list_nchan, format='I')
-    #col_matrix = fits.Column(name='MATRIX', array=list_matrix, format='E')
-    #my_header = hdu_list[1].header
-    #my_table = fits.BinTableHDU.from_columns([col_energy_lo,col_energy_hi,col_ngrp,col_fchan,col_nchan,col_matrix],name='MATRIX',header=my_header)
-    #hdul = fits.HDUList([hdu_list[0], my_table])
-    #hdul.writeto('%s/table_rmf_%s.fits'%(output_dir,obsID), overwrite=True)
 
