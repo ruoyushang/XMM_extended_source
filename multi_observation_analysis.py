@@ -1119,22 +1119,35 @@ if write_xspec_output:
 
     list_chl = []
     list_cnt = []
+    list_bkg = []
     for ch in range(0,len(spectrum_rebin_raw_xry.xaxis)):
         list_chl += [ch]
         list_cnt += [spectrum_rebin_raw_xry.yaxis[ch]]
+        list_bkg += [0.]
     
     # Create a FITS table extension
     col_channel = fits.Column(name='CHANNEL', array=list_chl, format='I')
     col_count = fits.Column(name='COUNTS', array=list_cnt, format='J', unit='count')
-    my_header = hdu_list[1].header
-    my_table = fits.BinTableHDU.from_columns([col_channel,col_count],name='SPECTRUM',header=my_header)
+    col_bkgnd = fits.Column(name='COUNTS', array=list_bkg, format='J', unit='count')
+    my_spec_header = hdu_list[1].header
+    my_spec_table = fits.BinTableHDU.from_columns([col_channel,col_count],name='SPECTRUM',header=my_spec_header)
+    my_bkgd_table = fits.BinTableHDU.from_columns([col_channel,col_bkgnd],name='BACKFILE',header=my_spec_header)
     
+    arf_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
+    my_arf_hdu = fits.open(arf_filename)[1]
+    my_arf_hdu.name = 'ANCRFILE'
+    rmf_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-rmf.fits'
+    my_rmf_hdu = fits.open(rmf_filename)[1]
+    my_rmf_hdu.name = 'RESPFILE'
+
     # Combine the primary and table extensions
     print ('write output to %s/table_spectrum_%s.fits'%(output_dir,obsID))
-    hdul = fits.HDUList([hdu_list[0], my_table])
+    hdul = fits.HDUList([hdu_list[0], my_spec_table])
+    hdul.append(my_bkgd_table)
+    hdul.append(my_arf_hdu)
+    hdul.append(my_rmf_hdu)
     hdul.writeto('%s/table_spectrum_%s.fits'%(output_dir,obsID), overwrite=True)
         
-
     input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
     output_filename = '%s/table_arf_%s.fits'%(output_dir,obsID)
     shutil.copyfile(input_filename, output_filename)
