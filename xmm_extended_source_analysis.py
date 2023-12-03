@@ -90,6 +90,9 @@ ring_outer_radius = 6000
 
 sample_scale = 10.
 
+#timecut_threshold = 2.5 # tight, almost no SPF
+timecut_threshold = 5.0 # loose
+
 src_ra = 0
 src_dec = 0
 if 'Cas_A' in on_sample:
@@ -801,7 +804,7 @@ def make_timecut_mask(lightcurve_sci,lightcurve_ctl,lightcurve_sci_fov_mask):
     for idx in range(0,len(lightcurve_sci.xaxis)):
         if lightcurve_sci.yaxis[idx]==0.: continue
         sci_rate = (lightcurve_sci.yaxis[idx])
-        if (sci_rate-(avg_rate_fov+rms_rate_fov))/rms_rate_ctl>2.5:
+        if (sci_rate-(avg_rate_fov+rms_rate_fov))/rms_rate_ctl>timecut_threshold:
             lightcurve_sci_fov_mask.yaxis[idx] = 1.
 
     timecut_frac = 0.

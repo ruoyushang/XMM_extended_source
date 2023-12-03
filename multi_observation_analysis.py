@@ -24,15 +24,15 @@ job = sys.argv[3]
 mask_ra = 350.8075+0.05
 mask_dec = 58.8072+0.01
 #mask_inner_radius = 0.0
-#mask_outer_radius = 0.01
-#mask_inner_radius = 0.0
-#mask_outer_radius = 0.07
-#mask_inner_radius = 0.0
-#mask_outer_radius = 0.5
-#mask_inner_radius = 0.10
-#mask_outer_radius = 0.20
-mask_inner_radius = 0.20
-mask_outer_radius = 0.40
+#mask_outer_radius = 0.05
+#mask_inner_radius = 0.05
+#mask_outer_radius = 0.1
+#mask_inner_radius = 0.1
+#mask_outer_radius = 0.15
+#mask_inner_radius = 0.15
+#mask_outer_radius = 0.2
+mask_inner_radius = 0.2
+mask_outer_radius = 0.25
 
 # 3HWC J1928
 #mask_ra = 292.1499583
@@ -58,6 +58,9 @@ mask_outer_detr = mask_outer_radius/(0.05/(60.*60.))
 #measure_cxb = True
 measure_cxb = False
 
+#bkg_only = True
+bkg_only = False
+
 include_cxb = True
 if measure_cxb:
     include_cxb = False
@@ -71,6 +74,9 @@ select_mask_events = False
 #select_mask_events = True
 
 # background study
+if bkg_only:
+    find_extended_src = True
+    select_mask_events = False
 if measure_cxb:
     find_extended_src = True
     select_mask_events = False
@@ -82,14 +88,9 @@ write_xspec_output = True
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 
-energy_cut_lower = 2000
+energy_cut_lower = 1000
+#energy_cut_lower = 2000
 energy_cut_upper = 12000
-#energy_cut_lower = 5200
-#energy_cut_upper = 6200
-#energy_cut_lower = 7000
-#energy_cut_upper = 9000
-#energy_cut_lower = 6200
-#energy_cut_upper = 7000
 
 on_exposure = 0.
 total_spectral_volume = 0.
@@ -863,6 +864,11 @@ def analyze_one_observation(obsID,detector):
     fig.savefig("%s/image_det_all_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
     axbig.remove()
 
+    font = {'family': 'serif',
+            'color':  'white',
+            'weight': 'normal',
+            'size': 10,
+            }
     fig.clf()
     axbig = fig.add_subplot()
     label_x = 'DETY'
@@ -875,6 +881,7 @@ def analyze_one_observation(obsID,detector):
     ymax = image_det_sci.yaxis.max()
     axbig.imshow(image_det_sci.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
     axbig.contour(image_det_mask.zaxis[:,:], np.arange(0.0, 1.5, 1.0), linestyles='solid', colors='red', extent=(xmin,xmax,ymin,ymax))
+    axbig.text(-17000, 17000, 'Galac coord. = (%0.1f, %0.1f)'%(sky_l_center,sky_b_center), fontdict=font)
     fig.savefig("%s/image_det_sci_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
     axbig.remove()
 
@@ -947,6 +954,7 @@ def get_observation_pointings(run_list):
     return sky_ra_min, sky_dec_min, sky_ra_max, sky_dec_max, sky_ra_first, sky_dec_first
 
 sky_ra_lower, sky_dec_lower, sky_ra_upper, sky_dec_upper, sky_ra_center, sky_dec_center = get_observation_pointings(on_run_list)
+sky_l_center, sky_b_center = ConvertRaDecToGalactic(sky_ra_center, sky_dec_center)
 sky_l_lower, sky_b_lower = ConvertRaDecToGalactic(sky_ra_lower, sky_dec_lower)
 sky_l_upper, sky_b_upper = ConvertRaDecToGalactic(sky_ra_upper, sky_dec_upper)
 
