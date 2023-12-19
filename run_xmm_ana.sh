@@ -57,32 +57,32 @@
 #obs_ID_list+=('0553640101')
 #obs_ID_list+=('0506430101')
 
-source_name='MGRO_J2019_p37'
-obs_ID_list=()
-obs_ID_list+=('0212481201')
-obs_ID_list+=('0744640101')
-obs_ID_list+=('0692810501')
-obs_ID_list+=('0670480501')
-obs_ID_list+=('0652770101')
-obs_ID_list+=('0782961201')
-obs_ID_list+=('0795712301')
-obs_ID_list+=('0304000201')
-obs_ID_list+=('0510011401')
-obs_ID_list+=('0670480401')
-obs_ID_list+=('0880030501')
-obs_ID_list+=('0206240801')
-obs_ID_list+=('0600030201')
-obs_ID_list+=('0552350101')
-obs_ID_list+=('0206240401')
-obs_ID_list+=('0692810301')
-obs_ID_list+=('0206240201')
-obs_ID_list+=('0206240701')
-obs_ID_list+=('0674050101')
-obs_ID_list+=('0692810401')
-obs_ID_list+=('0692810601')
-obs_ID_list+=('0723310201')
-obs_ID_list+=('0721570101')
-obs_ID_list+=('0720600101')
+#source_name='MGRO_J2019_p37'
+#obs_ID_list=()
+#obs_ID_list+=('0212481201')
+#obs_ID_list+=('0744640101')
+#obs_ID_list+=('0692810501')
+#obs_ID_list+=('0670480501')
+#obs_ID_list+=('0652770101')
+#obs_ID_list+=('0782961201')
+#obs_ID_list+=('0795712301')
+#obs_ID_list+=('0304000201')
+#obs_ID_list+=('0510011401')
+#obs_ID_list+=('0670480401')
+#obs_ID_list+=('0880030501')
+#obs_ID_list+=('0206240801')
+#obs_ID_list+=('0600030201')
+#obs_ID_list+=('0552350101')
+#obs_ID_list+=('0206240401')
+#obs_ID_list+=('0692810301')
+#obs_ID_list+=('0206240201')
+#obs_ID_list+=('0206240701')
+#obs_ID_list+=('0674050101')
+#obs_ID_list+=('0692810401')
+#obs_ID_list+=('0692810601')
+#obs_ID_list+=('0723310201')
+#obs_ID_list+=('0721570101')
+#obs_ID_list+=('0720600101')
 #
 #source_name='PSR_J1928_p1746'
 #obs_ID_list=()
@@ -113,6 +113,24 @@ obs_ID_list+=('0720600101')
 #obs_ID_list+=('0400600101')
 #obs_ID_list+=('0820840501')
 #obs_ID_list+=('0149610301')
+#obs_ID_list+=('0743980301')
+#obs_ID_list+=('0727961301')
+#obs_ID_list+=('0745240201')
+
+source_name='Geminga'
+obs_ID_list=()
+obs_ID_list+=('0501270301')
+obs_ID_list+=('0550410301')
+obs_ID_list+=('0691980201')
+obs_ID_list+=('0400260201')
+obs_ID_list+=('0201350101')
+obs_ID_list+=('0301230101')
+obs_ID_list+=('0501270201')
+obs_ID_list+=('0400260301')
+obs_ID_list+=('0311591001')
+obs_ID_list+=('0111170101')
+obs_ID_list+=('0550410201')
+
 
 for i in ${obs_ID_list[@]}
 do
@@ -124,16 +142,16 @@ do
     cp /Users/rshang/xmm_analysis/analysis_code/*.sh .
     cp /Users/rshang/xmm_analysis/analysis_code/*.py .
 
-    #sh extract_data.sh
-    #sh run_cifbuild.sh
-    #sh clean.sh 
-    #sh run_ana_chains.sh
+    sh extract_data.sh
+    sh run_cifbuild.sh
+    sh clean.sh 
+    sh run_ana_chains.sh
     
     #sh run_rename.sh $1 $2
     
     #sh run_filtering.sh
-    sh run_skyref.sh
-    sh run_esky2det.sh
+    #sh run_skyref.sh
+    #sh run_esky2det.sh
     #sh run_response.sh
     #
     #sh run_edet2sky.sh

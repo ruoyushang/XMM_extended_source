@@ -9,69 +9,76 @@ file_dir = '../output_plots/plot_Cas_A/'
 #runID = '0400210101'
 runID = '0412180101'
 
-data_file = "%s/table_spectrum_%s.fits"%(file_dir,runID)
-rmf_file = "%s/table_rmf_%s.fits"%(file_dir,runID)
-arf_file = "%s/table_arf_%s.fits"%(file_dir,runID)
+#region = 'r0'
+region = 'r1'
+#region = 'r2'
+#region = 'r3'
+#region = 'r4'
+
+# running grppha in python: https://github.com/tenoto/fspec/blob/master/fgrppha.py
+inpha =  "%s/table_spectrum_data_%s_%s.fits"%(file_dir,runID,region)
+outpha = "%s/table_spectrum_data_%s_%s_grppha.fits"%(file_dir,runID,region)
+cmd  = 'rm %s\n' % outpha
+cmd += 'grppha<<EOF\n'
+cmd += '%s\n' % inpha
+cmd += '%s\n' % outpha
+cmd += "group min 200\n"
+cmd += "exit\n"
+cmd += "EOF\n"
+os.system(cmd)
+
+data_file = "%s/table_spectrum_data_%s_%s_grppha.fits"%(file_dir,runID,region)
+bkg_file = "%s/table_spectrum_bkgd_%s_%s.fits"%(file_dir,runID,region)
+rmf_file = "%s/table_rmf_%s_%s.fits"%(file_dir,runID,region)
+arf_file = "%s/table_arf_%s_%s.fits"%(file_dir,runID,region)
 print (f'data_file = {data_file}')
 #exit()
 
-data = xspec.Spectrum(data_file,respFile=rmf_file,arfFile=arf_file)
+data = xspec.Spectrum(data_file,backFile=bkg_file,respFile=rmf_file,arfFile=arf_file)
 
 #model = xspec.Model("bbody+gaus+gaus+gaus+gaus+gaus+gaus+gaus+gaus")
-model = xspec.Model("vapec")
-#model = xspec.Model("vvapec")
+#model = xspec.Model("vapec")
+model = xspec.Model("vnei")
 ncomp = len(model.componentNames)
 print (f'===================================================================================================')
 for icomp in model.componentNames:
     print (icomp,eval(f'model.{icomp}.parameterNames'))
 #exit()
 
-model.vapec.kT.frozen = False
-model.vapec.He.frozen = False
-model.vapec.C.frozen = False
-model.vapec.N.frozen = False
-model.vapec.O.frozen = False
-model.vapec.Ne.frozen = False
-model.vapec.Mg.frozen = False
-model.vapec.Al.frozen = False
-model.vapec.Si.frozen = False
-model.vapec.S.frozen = False
-model.vapec.Ar.frozen = False
-model.vapec.Ca.frozen = False
-model.vapec.Fe.frozen = False
-model.vapec.Ni.frozen = False
+#model.vapec.kT.frozen = False
+#model.vapec.Redshift.frozen = False
+##model.vapec.He.frozen = False
+##model.vapec.C.frozen = False
+##model.vapec.N.frozen = False
+##model.vapec.O.frozen = False
+##model.vapec.Ne.frozen = False
+##model.vapec.Mg.frozen = False
+##model.vapec.Al.frozen = False
+##model.vapec.Si.frozen = False
+##model.vapec.S.frozen = False
+##model.vapec.Ar.frozen = False
+#model.vapec.Ca.frozen = False
+#model.vapec.Fe.frozen = False
+##model.vapec.Ni.frozen = False
 
-#model.vvapec.kT.frozen = False
-#model.vvapec.H.frozen = False
-#model.vvapec.He.frozen = False
-#model.vvapec.Li.frozen = False
-#model.vvapec.Be.frozen = False
-#model.vvapec.B.frozen = False
-#model.vvapec.C.frozen = False
-#model.vvapec.N.frozen = False
-#model.vvapec.O.frozen = False
-#model.vvapec.F.frozen = False
-#model.vvapec.Ne.frozen = False
-#model.vvapec.Na.frozen = False
-#model.vvapec.Mg.frozen = False
-#model.vvapec.Al.frozen = False
-#model.vvapec.Si.frozen = False
-#model.vvapec.P.frozen = False
-#model.vvapec.S.frozen = False
-#model.vvapec.Cl.frozen = False
-#model.vvapec.Ar.frozen = False
-#model.vvapec.K.frozen = False
-#model.vvapec.Ca.frozen = False
-#model.vvapec.Sc.frozen = False
-#model.vvapec.Ti.frozen = False
-#model.vvapec.V.frozen = False
-#model.vvapec.Cr.frozen = False
-#model.vvapec.Mn.frozen = False
-#model.vvapec.Fe.frozen = False
-#model.vvapec.Co.frozen = False
-#model.vvapec.Ni.frozen = False
-#model.vvapec.Cu.frozen = False
-#model.vvapec.Zn.frozen = False
+model.vnei.kT.frozen = False
+model.vnei.Redshift.frozen = False
+#model.vnei.H.frozen = False
+#model.vnei.He.frozen = False
+#model.vnei.C.frozen = False
+#model.vnei.N.frozen = False
+model.vnei.O.frozen = False
+model.vnei.Ne.frozen = False
+model.vnei.Mg.frozen = False
+model.vnei.Si.frozen = False
+model.vnei.S.frozen = False
+model.vnei.Ar.frozen = False
+model.vnei.Ca.frozen = False
+model.vnei.Fe.frozen = False
+#model.vnei.Ni.frozen = False
+
+#model.nei.kT.frozen = False
+#model.nei.Abundanc.frozen = False
 
 #model.bbody.kT.frozen = False
 #line_FeXXV = 6.6
@@ -100,9 +107,9 @@ model.vapec.Ni.frozen = False
 #model.gaussian_9.LineE.frozen = True
 
 
-startE = 1.0 # keV
-#startE = 3.0 # keV
-endE = 9.0 # keV
+#startE = 1.0 # keV
+startE = 1.7 # keV
+endE = 8.0 # keV
 data.notice("all")
 data.ignore(f"bad")
 data.ignore(f"**-{startE} {endE}-**")
@@ -113,42 +120,42 @@ line_name += ['Fe XXV']
 line_energy += [6.6]
 line_name += ['Ca XIX']
 line_energy += [3.902]
-line_name += ['Ar XVIII']
-line_energy += [3.323]
+#line_name += ['Ar XVIII']
+#line_energy += [3.323]
 line_name += ['Ar XVII']
 line_energy += [3.140]
-line_name += ['S XVI']
-line_energy += [3.107]
-line_name += ['S XV']
-line_energy += [2.884]
-line_name += ['S XVI']
-line_energy += [2.620]
-line_name += ['Si XIV']
-line_energy += [2.506]
+#line_name += ['S XVI']
+#line_energy += [3.107]
+#line_name += ['S XV']
+#line_energy += [2.884]
+#line_name += ['S XVI']
+#line_energy += [2.620]
+#line_name += ['Si XIV']
+#line_energy += [2.506]
 line_name += ['S XV']
 line_energy += [2.449]
-line_name += ['Si XIV']
-line_energy += [2.376]
-line_name += ['Si XIII']
-line_energy += [2.294]
-line_name += ['Si XIII']
-line_energy += [2.183]
-line_name += ['Si XIV']
-line_energy += [2.0]
+#line_name += ['Si XIV']
+#line_energy += [2.376]
+#line_name += ['Si XIII']
+#line_energy += [2.294]
+#line_name += ['Si XIII']
+#line_energy += [2.183]
+#line_name += ['Si XIV']
+#line_energy += [2.0]
 line_name += ['Si XIII']
 line_energy += [1.865]
-line_name += ['Mg XII']
-line_energy += [1.473]
-line_name += ['Fe XXI']
-line_energy += [1.314]
-line_name += ['Fe XXIII']
-line_energy += [1.129]
-line_name += ['Fe XXII']
-line_energy += [1.053]
-line_name += ['Fe XXIII']
-line_energy += [1.020]
-line_name += ['Fe XXI']
-line_energy += [1.000]
+#line_name += ['Mg XII']
+#line_energy += [1.473]
+#line_name += ['Fe XXI']
+#line_energy += [1.314]
+#line_name += ['Fe XXIII']
+#line_energy += [1.129]
+#line_name += ['Fe XXII']
+#line_energy += [1.053]
+#line_name += ['Fe XXIII']
+#line_energy += [1.020]
+#line_name += ['Fe XXI']
+#line_energy += [1.000]
 
 
 model.show()
@@ -195,15 +202,28 @@ arrowprops = dict(arrowstyle="->")
 fig, ax = plt.subplots(figsize=(10,6))
 #ax.errorbar(df.e, df.rate, xerr=df.de,yerr=df.rate_err,label='data')
 ax.plot(df.e, df.rate, label='data')
-ax.plot(df.e, df.total, color='red',label='VApec model (kT = %0.3f +/- %0.3f %s)'%(model.vapec.kT.values[0],model.vapec.kT.sigma,model.vapec.kT.unit))
+#ax.plot(df.e, df.total, color='red',label='vapec model')
+ax.plot(df.e, df.total, color='red',label='vnei model')
 #for j in range(ncomp):
 #    ax.plot(df.e, df[f'model{j}'],label=f'{model.componentNames[j]}')
 max_height = np.max(df.total)
 for line in range(0,len(line_name)):
     line_idx = find_closest_index(df.e, line_energy[line])
-    text_height = df.total[line_idx] + 0.1*(line % 2 + 1)*max_height
-    #ax.text(line_energy[line], text_height, line_name[line], fontdict=font)
-    ax.annotate(line_name[line], xy=(line_energy[line], df.total[line_idx]), xytext=(line_energy[line], text_height), arrowprops=arrowprops)
+    text_height = df.total[line_idx] * 0.1
+    ax.annotate(line_name[line], xy=(line_energy[line], 0.5*df.total[line_idx]), xytext=(line_energy[line], text_height), arrowprops=arrowprops)
+textstr = '\n'.join((
+    #r'kT = $%.2f \pm %.2f$ %s' % (model.vapec.kT.values[0],model.vapec.kT.sigma,model.vapec.kT.unit),
+    #r'Ca = $%.2f \pm %.2f$ %s' % (model.vapec.Ca.values[0],model.vapec.Ca.sigma,model.vapec.Ca.unit),
+    #r'Fe = $%.2f \pm %.2f$ %s' % (model.vapec.Fe.values[0],model.vapec.Fe.sigma,model.vapec.Fe.unit),
+    r'kT = $%.2f \pm %.2f$ %s' % (model.vnei.kT.values[0],model.vnei.kT.sigma,model.vnei.kT.unit),
+    r'Si = $%.2f \pm %.2f$ %s' % (model.vnei.Si.values[0],model.vnei.Si.sigma,model.vnei.Si.unit),
+    r'S  = $%.2f \pm %.2f$ %s' % (model.vnei.S.values[0],model.vnei.S.sigma,model.vnei.S.unit),
+    r'Ar = $%.2f \pm %.2f$ %s' % (model.vnei.Ar.values[0],model.vnei.Ar.sigma,model.vnei.Ar.unit),
+    r'Ca = $%.2f \pm %.2f$ %s' % (model.vnei.Ca.values[0],model.vnei.Ca.sigma,model.vnei.Ca.unit),
+    r'Fe = $%.2f \pm %.2f$ %s' % (model.vnei.Fe.values[0],model.vnei.Fe.sigma,model.vnei.Fe.unit),
+    ))
+props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+ax.text(0.70, 0.85, textstr, transform=ax.transAxes, fontsize=14,verticalalignment='top', bbox=props)
 ax.set_xlabel('Energy (keV)')
 ax.set_ylabel(r'counts/s/keV')
 ax.set_xscale("log")
@@ -211,9 +231,6 @@ ax.set_yscale("log")
 #ax.set_ylim((0.001,0.1))
 ax.grid()
 ax.legend()
-fig.savefig('%s/fit_result.png'%(file_dir),bbox_inches='tight')
+fig.savefig('%s/fit_result_%s.png'%(file_dir,region),bbox_inches='tight')
 
-print (f'model.vapec.kT.values = {model.vapec.kT.values}')
-print (f'model.vapec.kT.sigma = {model.vapec.kT.sigma}')
-print (f'model.vapec.kT.unit = {model.vapec.kT.unit}')
 print ('Done.')

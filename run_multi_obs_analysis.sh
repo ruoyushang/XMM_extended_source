@@ -42,8 +42,17 @@ ID_list=()
 #ID_list+=('0149610301_mos1+0149610301_mos2') 
 #ID_list+=('0057540101_mos1+0057540101_mos2') # supernova remnant (SNR) CTB109 
 #ID_list+=('0820840501_mos1' '0820840501_mos2') # Solar Wind Charge Exchange (SWCX)
-ID_list+=('0412180101_mos1+0412180101_mos2') # Cas A
+#ID_list+=('0412180101_mos1+0412180101_mos2') # Cas A
 #ID_list+=('0400210101_mos1+0400210101_mos2') # Cas A Northern lobe
+#ID_list+=('0743980301_mos1+0743980301_mos2') # x-ray pulsar
+#ID_list+=('0727961301_mos1+0727961301_mos2') # x-ray pulsar
+ID_list+=('0745240201_mos2') # x-ray pulsar
+
+#source_name='CygX3'
+#ID_list=()
+#ID_list+=('0165360101_mos1+0165360101_mos2')
+#ID_list+=('0165360201_mos1+0165360201_mos2')
+#ID_list+=('0165360401_mos1+0165360401_mos2')
 
 #source_name='PSR_J1928_p1746'
 #ID_list=()
@@ -109,6 +118,9 @@ ID_list+=('0412180101_mos1+0412180101_mos2') # Cas A
 #ID_list+=('0674050101_mos1' '0674050101_mos2') # source of interest
 #ID_list+=('0552350101_mos1' '0552350101_mos2') # source of interest
 
+#ana_tag=''
+#ana_tag='smallbin'
+ana_tag='largebin'
 
 rm -r /Users/rshang/xmm_analysis/output_plots/'plot_'$source_name 
 mkdir /Users/rshang/xmm_analysis/output_plots/'plot_'$source_name
@@ -118,6 +130,6 @@ for i in ${ID_list[@]}
 do
     obs_ID=$i
     echo $job
-    python3 multi_observation_analysis.py $source_name $obs_ID $job
+    python3 multi_observation_analysis.py $source_name $obs_ID $job $ana_tag
     job=$((job+1))
 done

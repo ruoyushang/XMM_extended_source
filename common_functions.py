@@ -11,6 +11,7 @@ pattern_scale = 1
 ch_low = 200
 ch_high = 12000
 ch_scale = 50 # change energy binning here
+#ch_scale = 500 # change energy binning here
 t_low = 0
 t_high = 1
 t_scale = 0.01
@@ -191,7 +192,7 @@ class MyArray1D:
             integral_range=[self.xaxis[0],self.xaxis[len(self.yaxis)-1]]
         for entry in range(0,len(self.xaxis)):
             if self.xaxis[entry]<integral_range[0]: continue
-            if self.xaxis[entry]>integral_range[1]: continue
+            if self.xaxis[entry]>=integral_range[1]: continue
             integral_cnt += self.yaxis[entry]
         return integral_cnt
     def fill(self, value, weight=1.):

@@ -76,13 +76,15 @@ on_filter = sys.argv[4]
 #on_filter = 'reg3'
 #on_filter = 'reg4'
 
+ana_tag = sys.argv[5]
+
 #energy_array = [2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 energy_array = [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 #ana_ccd_bins = [1]
 ana_ccd_bins = [0]
 
-output_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+on_obsID
+output_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/'+on_obsID
 
 source_radius = 1000
 ring_inner_radius = 1500
@@ -90,8 +92,8 @@ ring_outer_radius = 6000
 
 sample_scale = 10.
 
-#timecut_threshold = 2.5 # tight, almost no SPF
-timecut_threshold = 5.0 # loose
+timecut_threshold = 2.5 # tight, almost no SPF
+#timecut_threshold = 5.0 # loose
 
 src_ra = 0
 src_dec = 0

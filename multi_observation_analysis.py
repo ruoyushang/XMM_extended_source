@@ -13,47 +13,14 @@ from scipy.optimize import curve_fit
 from scipy import fftpack
 import matplotlib.pyplot as plt
 from matplotlib import colors
+import pickle
 
 import common_functions
 
 on_sample = sys.argv[1]
 on_obsID = sys.argv[2]
 job = sys.argv[3]
-
-# Cas A
-mask_ra = 350.8075+0.05
-mask_dec = 58.8072+0.01
-#mask_inner_radius = 0.0
-#mask_outer_radius = 0.05
-#mask_inner_radius = 0.05
-#mask_outer_radius = 0.1
-#mask_inner_radius = 0.1
-#mask_outer_radius = 0.15
-#mask_inner_radius = 0.15
-#mask_outer_radius = 0.2
-mask_inner_radius = 0.2
-mask_outer_radius = 0.25
-
-# 3HWC J1928
-#mask_ra = 292.1499583
-#mask_dec = 17.9011111
-#mask_inner_radius = 0.
-#mask_outer_radius = 0.5
-#mask_inner_radius = 0.05
-#mask_outer_radius = 0.5
-
-# 3HWC J1930
-#mask_ra = 292.6258333
-#mask_dec = 18.8708889
-#mask_inner_radius = 0.
-#mask_outer_radius = 0.5
-#mask_inner_radius = 0.035
-#mask_outer_radius = 0.08
-
-mask_detx = 0.
-mask_dety = 0.
-mask_inner_detr = mask_inner_radius/(0.05/(60.*60.))
-mask_outer_detr = mask_outer_radius/(0.05/(60.*60.))
+ana_tag = sys.argv[4]
 
 #measure_cxb = True
 measure_cxb = False
@@ -88,24 +55,24 @@ write_xspec_output = True
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 
-energy_cut_lower = 1000
-#energy_cut_lower = 2000
-energy_cut_upper = 12000
+#energy_cut_lower = 1000
+energy_cut_lower = 1700
+energy_cut_upper = 8000
+#energy_cut_upper = 12000
 
 on_exposure = 0.
 total_spectral_volume = 0.
 
 energy_array = [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
-cxb_radial_array = [0.,0.04,0.08,0.12,0.16,0.20,0.24,0.28]
 
-delta_energy = energy_array[1]-energy_array[0]
-cxb_delta_energy = delta_energy/4.
-cxb_energy_array = []
-cxb_energy = energy_array[0]
-while cxb_energy<=energy_array[len(energy_array)-1]:
-    cxb_energy_array += [cxb_energy]
-    cxb_energy += cxb_delta_energy
-print (f'cxb_energy_array = {cxb_energy_array}')
+#delta_energy = energy_array[1]-energy_array[0]
+#cxb_delta_energy = delta_energy/4.
+#cxb_energy_array = []
+#cxb_energy = energy_array[0]
+#while cxb_energy<=energy_array[len(energy_array)-1]:
+#    cxb_energy_array += [cxb_energy]
+#    cxb_energy += cxb_delta_energy
+#print (f'cxb_energy_array = {cxb_energy_array}')
 
 sample_scale = 10.
 
@@ -443,8 +410,8 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
         print (f'Load data for obsID = {obsID}, detector = {detector}')
     print (f'{len(cxb_measurement)} CXB measurements are used.')
 
-    hist_cxb_measurement = MyArray1D(bin_start=cxb_energy_array[0],bin_end=cxb_energy_array[len(cxb_energy_array)-1],pixel_scale=cxb_energy_array[1]-cxb_energy_array[0])
-    for ch in range(0,len(cxb_energy_array)-1):
+    hist_cxb_measurement = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+    for ch in range(0,len(hist_cxb.xaxis)):
         n_samples = 0.
         avg_cxb = 0.
         total_weight = 0.
@@ -454,7 +421,7 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
             avg_cxb += cxb_measurement[m][ch]*cxb_measurement_weight[m]
         avg_cxb = avg_cxb/total_weight
         hist_cxb_measurement.yaxis[ch] = avg_cxb
-    for ch in range(0,len(cxb_energy_array)-1):
+    for ch in range(0,len(hist_cxb.xaxis)):
         n_samples = 0.
         avg_cxb = hist_cxb_measurement.yaxis[ch]
         rms_cxb = 0.
@@ -479,8 +446,8 @@ def analyze_one_observation(obsID,detector):
     print (f'analyze obsID {obsID} detector {detector}')
 
 
-    input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/ID'+obsID
-    cxb_output_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample
+    input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
+    cxb_output_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag
     output_dir = '/Users/rshang/xmm_analysis/output_plots/plot_%s/'%(on_sample)
 
     print (f'input_dir = {input_dir}')
@@ -541,7 +508,7 @@ def analyze_one_observation(obsID,detector):
     ymin = image_det_diff_lofreq.yaxis.min()
     ymax = image_det_diff_lofreq.yaxis.max()
     axbig.imshow(image_det_diff_lofreq.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-    fig.savefig("%s/image_det_diff_lofreq_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
+    fig.savefig("%s/image_det_diff_lofreq_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region),bbox_inches='tight')
     axbig.remove()
 
     if find_extended_src:
@@ -554,7 +521,7 @@ def analyze_one_observation(obsID,detector):
         axbig.set_yscale('log')
         axbig.set_xlabel('Gravity')
         axbig.legend(loc='best')
-        fig.savefig("%s/gravity_lofreq_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
+        fig.savefig("%s/gravity_lofreq_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region),bbox_inches='tight')
         axbig.remove()
 
     if abs(mask_detx)<20000 and abs(mask_dety)<20000: 
@@ -579,7 +546,7 @@ def analyze_one_observation(obsID,detector):
     ymin = image_det_mask.yaxis.min()
     ymax = image_det_mask.yaxis.max()
     axbig.imshow(image_det_mask.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
-    fig.savefig("%s/image_det_mask_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
+    fig.savefig("%s/image_det_mask_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region),bbox_inches='tight')
     axbig.remove()
 
 
@@ -634,6 +601,7 @@ def analyze_one_observation(obsID,detector):
     sky_dec_center = sci_hdu_list[1].header['REF_DEC']
     sky_l_center, sky_b_center = ConvertRaDecToGalactic(sky_ra_center, sky_dec_center)
 
+    aeff_r = -1
     for r in range(0,len(area_curve)):
         arf_filename = '%s/sci_area_r%s_%s_ccd%s.fits'%(input_dir,r,detector,ana_ccd_bins[0])
         arf_hdu_list = fits.open(arf_filename)
@@ -643,12 +611,15 @@ def analyze_one_observation(obsID,detector):
             entry_area = arf_table[entry]['AREA']
             print (f'energy = {entry_energy}, area = {entry_area}')
             area_curve[r].fill(entry_energy,weight=entry_area)
+        print (f'area_curve[{r}] = {area_curve[r].yaxis[0]}')
+        if area_curve[r].yaxis[0]>0. and aeff_r==-1:
+            aeff_r = r
 
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[0])
     sci_hdu_list = fits.open(sci_filename)
     exposure = sci_hdu_list[1].header['EXPOSURE']
-    spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[0].yaxis[0]
-    print (f'area = {area_curve[0].yaxis[0]}')
+    spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[aeff_r].yaxis[0]
+    print (f'area = {area_curve[aeff_r].yaxis[0]}')
     print (f'exposure = {exposure}')
     print (f'spectral_volume = {spectral_volume}')
 
@@ -675,7 +646,7 @@ def analyze_one_observation(obsID,detector):
             evt_dec = sci_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
-            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[0].yaxis[0]
+            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]
             image_det_all.fill(evt_detx,evt_dety,weight=1./spacial_volume)
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
@@ -704,8 +675,8 @@ def analyze_one_observation(obsID,detector):
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
             radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
-            radial_acceptance = area_curve[radius].yaxis[0]/area_curve[0].yaxis[0]
-            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[0].yaxis[0]
+            radial_acceptance = area_curve[radius].yaxis[0]/area_curve[aeff_r].yaxis[0]
+            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -736,9 +707,9 @@ def analyze_one_observation(obsID,detector):
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
             radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
-            #radial_acceptance = area_curve[radius].yaxis[0]/area_curve[0].yaxis[0]
+            #radial_acceptance = area_curve[radius].yaxis[0]/area_curve[aeff_r].yaxis[0]
             radial_acceptance = 1.
-            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[0].yaxis[0]
+            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -773,13 +744,12 @@ def analyze_one_observation(obsID,detector):
     exposure = sci_hdu_list[1].header['EXPOSURE']
 
     cxb_spectrum_measurement_tmp = []
-    for ch in range(0,len(cxb_energy_array)-1):
-        sci_cnt = spectrum_sci.integral(integral_range=[cxb_energy_array[ch],cxb_energy_array[ch+1]])
-        spf_cnt = spectrum_spf.integral(integral_range=[cxb_energy_array[ch],cxb_energy_array[ch+1]])
-        qpb_cnt = spectrum_qpb.integral(integral_range=[cxb_energy_array[ch],cxb_energy_array[ch+1]])
+    for ch in range(0,len(spectrum_cxb.xaxis)):
+        sci_cnt = spectrum_sci.yaxis[ch]
+        spf_cnt = spectrum_spf.yaxis[ch]
+        qpb_cnt = spectrum_qpb.yaxis[ch]
         bkg_cnt = spf_cnt+qpb_cnt
-        nbins = (cxb_energy_array[ch+1]-cxb_energy_array[ch])/ch_scale
-        cxb_spectrum_measurement_tmp += [(sci_cnt-bkg_cnt)/nbins]
+        cxb_spectrum_measurement_tmp += [(sci_cnt-bkg_cnt)]
 
     MakeRadialProjection(image_icrs_sci, radial_sci)
     MakeRadialProjection(image_icrs_qpb, radial_qpb)
@@ -820,7 +790,7 @@ def analyze_one_observation(obsID,detector):
     axbig.set_xlabel('Energy [eV]')
     axbig.set_ylabel('Area [cm2]')
     axbig.legend(loc='best')
-    fig.savefig("%s/area_curve_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
+    fig.savefig("%s/area_curve_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region),bbox_inches='tight')
     axbig.remove()
 
     fig.clf()
@@ -831,9 +801,14 @@ def analyze_one_observation(obsID,detector):
     axbig.set_xlabel('Time')
     axbig.set_ylabel('Count')
     axbig.legend(loc='best')
-    fig.savefig("%s/lightcurve_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
+    fig.savefig("%s/lightcurve_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region),bbox_inches='tight')
     axbig.remove()
 
+    font = {'family': 'serif',
+            'color':  'white',
+            'weight': 'normal',
+            'size': 10,
+            }
     fig.clf()
     axbig = fig.add_subplot()
     label_x = 'DETY'
@@ -846,7 +821,8 @@ def analyze_one_observation(obsID,detector):
     ymax = image_det_all.yaxis.max()
     axbig.imshow(image_det_all.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax), norm=colors.LogNorm())
     axbig.contour(image_det_mask.zaxis[:,:], np.arange(0.0, 1.5, 1.0), linestyles='solid', colors='red', extent=(xmin,xmax,ymin,ymax))
-    fig.savefig("%s/image_det_all_log_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
+    axbig.text(-17000, 17000, 'Galac coord. = (%0.1f, %0.1f)'%(sky_l_center,sky_b_center), fontdict=font)
+    fig.savefig("%s/image_det_all_log_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region),bbox_inches='tight')
     axbig.remove()
 
     fig.clf()
@@ -861,14 +837,10 @@ def analyze_one_observation(obsID,detector):
     ymax = image_det_all.yaxis.max()
     axbig.imshow(image_det_all.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
     axbig.contour(image_det_mask.zaxis[:,:], np.arange(0.0, 1.5, 1.0), linestyles='solid', colors='red', extent=(xmin,xmax,ymin,ymax))
-    fig.savefig("%s/image_det_all_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
+    axbig.text(-17000, 17000, 'Galac coord. = (%0.1f, %0.1f)'%(sky_l_center,sky_b_center), fontdict=font)
+    fig.savefig("%s/image_det_all_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region),bbox_inches='tight')
     axbig.remove()
 
-    font = {'family': 'serif',
-            'color':  'white',
-            'weight': 'normal',
-            'size': 10,
-            }
     fig.clf()
     axbig = fig.add_subplot()
     label_x = 'DETY'
@@ -882,7 +854,7 @@ def analyze_one_observation(obsID,detector):
     axbig.imshow(image_det_sci.zaxis[:,:],origin='lower',cmap=map_color,extent=(xmin,xmax,ymin,ymax))
     axbig.contour(image_det_mask.zaxis[:,:], np.arange(0.0, 1.5, 1.0), linestyles='solid', colors='red', extent=(xmin,xmax,ymin,ymax))
     axbig.text(-17000, 17000, 'Galac coord. = (%0.1f, %0.1f)'%(sky_l_center,sky_b_center), fontdict=font)
-    fig.savefig("%s/image_det_sci_job%s_%s_%s.png"%(output_dir,job,obsID,detector),bbox_inches='tight')
+    fig.savefig("%s/image_det_sci_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region),bbox_inches='tight')
     axbig.remove()
 
     
@@ -899,7 +871,7 @@ def analyze_one_observation(obsID,detector):
     plot_bkg += [spectrum_qpb]
     plot_color += [color_list[0]]
     plot_label += ['QPB']
-    save_name = "%s/spectrum_job%s_%s_%s.png"%(output_dir,job,obsID,detector)
+    save_name = "%s/spectrum_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region)
     draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
 
     return spectral_volume
@@ -919,7 +891,7 @@ def get_observation_pointings(run_list):
     for run in run_list:
         obsID = run.split('_')[0]
         detector = run.split('_')[1]
-        input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/ID'+obsID
+        input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
         print (f'input_dir = {input_dir}')
         sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[0])
         sci_hdu_list = fits.open(sci_filename)
@@ -953,6 +925,271 @@ def get_observation_pointings(run_list):
 
     return sky_ra_min, sky_dec_min, sky_ra_max, sky_dec_max, sky_ra_first, sky_dec_first
 
+def main():
+
+    global mask_detx
+    global mask_dety
+
+    if not use_det_coord:
+        for run in on_run_list:
+            obsID = run.split('_')[0]
+            detector = run.split('_')[1]
+        
+            ref_sky = []
+            ref_det = []
+            mtx_det_2_sky = []
+            mtx_sky_2_det = []
+            for idx_ra in range(0,1):
+                for idx_dec in range(0,1):
+                    ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,'ID'+obsID)
+                    ref_sky += [ref_sky_local]
+                    ref_det += [ref_det_local]
+                    mtx_det_2_sky += [mtx_det_2_sky_local]
+                    mtx_sky_2_det += [mtx_sky_2_det_local]
+            mask_detx, mask_dety = ConvertSky2Det([mask_ra,mask_dec],ref_det[0],[sky_ra_center,sky_dec_center],mtx_sky_2_det[0])
+            print (f'mask_ra = {mask_ra}')
+            print (f'mask_dec = {mask_dec}')
+            print (f'mask_detx = {mask_detx}')
+            print (f'mask_dety = {mask_dety}')
+
+    total_spectral_volume = 0.
+    for run in on_run_list:
+        obsID = run.split('_')[0]
+        detector = run.split('_')[1]
+        spectral_volume = analyze_one_observation(obsID,detector)
+        total_spectral_volume += spectral_volume
+    
+    output_dir = '/Users/rshang/xmm_analysis/output_plots/plot_%s/'%(on_sample)
+    common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_sci,"%s/image_icrs_job%s_%s_%s.png"%(output_dir,job,obsID,region))
+    common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_sci,"%s/image_icrs_log_job%s_%s_%s.png"%(output_dir,job,obsID,region),log_scale=True)
+    
+    image_icrs_comb_xry.add(image_icrs_comb_sci)
+    image_icrs_comb_xry.add(image_icrs_comb_qpb,factor=-1.)
+    image_icrs_comb_xry.add(image_icrs_comb_spf,factor=-1.)
+    image_icrs_comb_xry.add(image_icrs_comb_cxb,factor=-1.)
+    common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_xry,"%s/image_icrs_xry_log_job%s_%s_%s.png"%(output_dir,job,obsID,region))
+    
+    plot_data = spectrum_comb_sci
+    plot_bkg = []
+    plot_color = []
+    plot_label = []
+    plot_bkg += [spectrum_comb_cxb]
+    plot_color += [color_list[2]]
+    plot_label += ['CXB']
+    plot_bkg += [spectrum_comb_spf]
+    plot_color += [color_list[1]]
+    plot_label += ['SPF']
+    plot_bkg += [spectrum_comb_qpb]
+    plot_color += [color_list[0]]
+    plot_label += ['QPB']
+    save_name = "%s/spectrum_comb_job%s_%s_%s.png"%(output_dir,job,obsID,region)
+    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
+    
+    MakeRadialProjection(image_icrs_comb_sci, radial_comb_sci)
+    MakeRadialProjection(image_icrs_comb_qpb, radial_comb_qpb)
+    MakeRadialProjection(image_icrs_comb_spf, radial_comb_spf)
+    MakeRadialProjection(image_icrs_comb_cxb, radial_comb_cxb)
+    
+    plot_data = radial_comb_sci
+    plot_bkg = []
+    plot_color = []
+    plot_label = []
+    plot_bkg += [radial_comb_cxb]
+    plot_color += [color_list[2]]
+    plot_label += ['CXB']
+    plot_bkg += [radial_comb_spf]
+    plot_color += [color_list[1]]
+    plot_label += ['SPF']
+    plot_bkg += [radial_comb_qpb]
+    plot_color += [color_list[0]]
+    plot_label += ['QPB']
+    save_name = "%s/radial_comb_job%s_%s_%s.png"%(output_dir,job,obsID,region)
+    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Angular distance [deg]','Photons /cm2/s/sr/keV',save_name,True)
+    
+    spectrum_comb_raw_xry.add(spectrum_comb_raw_sci)
+    spectrum_comb_raw_xry.add(spectrum_comb_raw_qpb,factor=-1.)
+    spectrum_comb_raw_xry.add(spectrum_comb_raw_spf,factor=-1.)
+    spectrum_comb_raw_xry.add(spectrum_comb_raw_cxb,factor=-1.)
+    spectrum_comb_raw_bkg.add(spectrum_comb_raw_qpb)
+    spectrum_comb_raw_bkg.add(spectrum_comb_raw_spf)
+    spectrum_comb_raw_bkg.add(spectrum_comb_raw_cxb)
+        
+    output_filename = f'{output_dir}/spectrum_{obsID}_{region}.pkl'
+    with open(output_filename,"wb") as file:
+        pickle.dump(spectrum_comb_raw_xry, file)
+    
+    if write_xspec_output:
+    
+        print (f'total_spectral_volume = {total_spectral_volume}')
+        for ch in range(0,len(spectrum_comb_raw_cxb.xaxis)):
+            ch_energy = spectrum_comb_raw_cxb.xaxis[ch]
+            ch_rebin = spectrum_comb_cxb.get_bin(ch_energy)
+            spectrum_comb_raw_cxb.yaxis[ch] = spectrum_comb_cxb.yaxis[ch_rebin]*total_spectral_volume
+            spectrum_comb_raw_cxb.yaxis[ch] = max(0.,spectrum_comb_raw_cxb.yaxis[ch])
+        
+        plot_data = spectrum_comb_raw_sci
+        plot_bkg = []
+        plot_color = []
+        plot_label = []
+        plot_bkg += [spectrum_comb_raw_cxb]
+        plot_color += [color_list[2]]
+        plot_label += ['CXB']
+        plot_bkg += [spectrum_comb_raw_spf]
+        plot_color += [color_list[1]]
+        plot_label += ['SPF']
+        plot_bkg += [spectrum_comb_raw_qpb]
+        plot_color += [color_list[0]]
+        plot_label += ['QPB']
+        save_name = "%s/spectrum_comb_raw_job%s_%s_%s.png"%(output_dir,job,obsID,region)
+        draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
+        
+        on_exposure = 0.
+        for run in on_run_list:
+            obsID = run.split('_')[0]
+            input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
+            sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos2',ana_ccd_bins[0])
+            sci_hdu_list = fits.open(sci_filename)
+            on_exposure += sci_hdu_list[1].header['EXPOSURE']
+        
+        input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
+        hdu_list = fits.open(input_filename)
+        mytable = Table.read(input_filename, hdu=1)
+        original_nbins = len(mytable)
+        spectrum_rebin_raw_xry = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
+        spectrum_rebin_raw_sci = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
+        spectrum_rebin_raw_bkg = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
+        for entry in range(0,len(mytable)):
+            spectrum_rebin_raw_xry.xaxis[entry] = 0.5*(mytable[entry]['ENERG_LO']+mytable[entry]['ENERG_HI'])*1000.
+            spectrum_rebin_raw_sci.xaxis[entry] = 0.5*(mytable[entry]['ENERG_LO']+mytable[entry]['ENERG_HI'])*1000.
+            spectrum_rebin_raw_bkg.xaxis[entry] = 0.5*(mytable[entry]['ENERG_LO']+mytable[entry]['ENERG_HI'])*1000.
+    
+        # Create a FITS header template from an XMM output
+        input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-pi.fits'
+        hdu_list = fits.open(input_filename)
+        mytable = Table.read(input_filename, hdu=1)
+        original_delta_energy = spectrum_comb_raw_xry.xaxis[1]-spectrum_comb_raw_xry.xaxis[0]
+        rebin_delta_energy = spectrum_rebin_raw_xry.xaxis[1]-spectrum_rebin_raw_xry.xaxis[0]
+        rebin_energy = spectrum_comb_raw_xry.xaxis[0]
+        ch_start = spectrum_rebin_raw_xry.get_bin(rebin_energy)
+        for ch in range(ch_start,len(spectrum_rebin_raw_xry.xaxis)):
+            ch_energy = spectrum_rebin_raw_xry.xaxis[ch]
+            ch_rebin = spectrum_comb_raw_xry.get_bin(ch_energy)
+            spectrum_rebin_raw_sci.yaxis[ch] = spectrum_comb_raw_sci.yaxis[ch_rebin]*rebin_delta_energy/original_delta_energy
+            spectrum_rebin_raw_bkg.yaxis[ch] = spectrum_comb_raw_bkg.yaxis[ch_rebin]*rebin_delta_energy/original_delta_energy
+            spectrum_rebin_raw_xry.yaxis[ch] = spectrum_comb_raw_xry.yaxis[ch_rebin]*rebin_delta_energy/original_delta_energy
+        
+        fig.clf()
+        axbig = fig.add_subplot()
+        axbig.plot(spectrum_rebin_raw_xry.xaxis,spectrum_rebin_raw_xry.yaxis,color='k')
+        axbig.set_xlabel('Energy')
+        axbig.set_ylabel('Count')
+        fig.savefig("%s/spectrum_rebin_%s_%s.png"%(output_dir,obsID,region),bbox_inches='tight')
+        axbig.remove()
+    
+        list_chl = []
+        list_cnt = []
+        list_bkg = []
+        for ch in range(0,len(spectrum_rebin_raw_xry.xaxis)):
+            list_chl += [ch]
+            list_cnt += [spectrum_rebin_raw_sci.yaxis[ch]]
+            list_bkg += [spectrum_rebin_raw_bkg.yaxis[ch]]
+        
+        # Create a FITS table extension
+        col_channel = fits.Column(name='CHANNEL', array=list_chl, format='I')
+        col_count = fits.Column(name='COUNTS', array=list_cnt, format='J', unit='count')
+        col_bkgnd = fits.Column(name='COUNTS', array=list_bkg, format='J', unit='count')
+        my_spec_header = hdu_list[1].header
+        my_spec_table = fits.BinTableHDU.from_columns([col_channel,col_count],name='SPECTRUM',header=my_spec_header)
+        my_bkgd_table = fits.BinTableHDU.from_columns([col_channel,col_bkgnd],name='BACKFILE',header=my_spec_header)
+        
+        arf_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
+        my_arf_hdu = fits.open(arf_filename)[1]
+        my_arf_hdu.name = 'ANCRFILE'
+        rmf_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-rmf.fits'
+        my_rmf_hdu = fits.open(rmf_filename)[1]
+        my_rmf_hdu.name = 'RESPFILE'
+    
+        # Combine the primary and table extensions
+        print ('write output to %s/table_spectrum_data_%s_%s.fits'%(output_dir,obsID,region))
+        hdul = fits.HDUList([hdu_list[0], my_spec_table])
+        hdul.writeto('%s/table_spectrum_data_%s_%s.fits'%(output_dir,obsID,region), overwrite=True)
+            
+        print ('write output to %s/table_spectrum_bkgd_%s_%s.fits'%(output_dir,obsID,region))
+        hdul = fits.HDUList([hdu_list[0], my_bkgd_table])
+        hdul.writeto('%s/table_spectrum_bkgd_%s_%s.fits'%(output_dir,obsID,region), overwrite=True)
+    
+        input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
+        output_filename = '%s/table_arf_%s_%s.fits'%(output_dir,obsID,region)
+        shutil.copyfile(input_filename, output_filename)
+    
+        input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-rmf.fits'
+        output_filename = '%s/table_rmf_%s_%s.fits'%(output_dir,obsID,region)
+        shutil.copyfile(input_filename, output_filename)
+
+use_det_coord = True
+mask_detx = -350.
+mask_dety = -350.
+
+region = 'r0'
+mask_inner_radius = 0.0
+mask_outer_radius = 0.3
+
+list_region = []
+list_mask_inner_radius = []
+list_mask_outer_radius = []
+
+# Cas A
+#mask_ra = 350.8075+0.05
+#mask_dec = 58.8072+0.01
+#list_region += ['r0']
+#list_mask_inner_radius += [0.0]
+#list_mask_outer_radius += [0.05]
+#list_region += ['r1']
+#list_mask_inner_radius += [0.05]
+#list_mask_outer_radius += [0.1]
+#list_region += ['r2']
+#list_mask_inner_radius += [0.1]
+#list_mask_outer_radius += [0.15]
+#list_region += ['r3']
+#list_mask_inner_radius += [0.15]
+#list_mask_outer_radius += [0.2]
+#list_region += ['r4']
+#list_mask_inner_radius += [0.2]
+#list_mask_outer_radius += [0.25]
+#list_region += ['r5']
+#list_mask_inner_radius += [0.25]
+#list_mask_outer_radius += [0.45]
+
+# 3HWC J1928
+#mask_ra = 292.1499583
+#mask_dec = 17.9011111
+
+# 3HWC J1930
+#mask_ra = 292.6258333
+#mask_dec = 18.8708889
+
+# Be/X-ray binary system EXO 2030+375
+mask_ra = 308.0637083
+mask_dec = 37.6375000
+#list_region += ['r0']
+#list_mask_inner_radius += [0.0]
+#list_mask_outer_radius += [0.3]
+list_region += ['r0']
+list_mask_inner_radius += [0.0]
+list_mask_outer_radius += [0.05]
+list_region += ['r1']
+list_mask_inner_radius += [0.05]
+list_mask_outer_radius += [0.1]
+list_region += ['r2']
+list_mask_inner_radius += [0.1]
+list_mask_outer_radius += [0.15]
+list_region += ['r3']
+list_mask_inner_radius += [0.15]
+list_mask_outer_radius += [0.2]
+list_region += ['r4']
+list_mask_inner_radius += [0.2]
+list_mask_outer_radius += [0.25]
+
 sky_ra_lower, sky_dec_lower, sky_ra_upper, sky_dec_upper, sky_ra_center, sky_dec_center = get_observation_pointings(on_run_list)
 sky_l_center, sky_b_center = ConvertRaDecToGalactic(sky_ra_center, sky_dec_center)
 sky_l_lower, sky_b_lower = ConvertRaDecToGalactic(sky_ra_lower, sky_dec_lower)
@@ -983,186 +1220,42 @@ spectrum_comb_raw_qpb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_
 spectrum_comb_raw_spf = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_raw_cxb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_raw_xry = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_raw_bkg = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 radial_comb_sci = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
 radial_comb_qpb = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
 radial_comb_spf = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
 radial_comb_cxb = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
 radial_comb_sci = MyArray1D(bin_start=0,bin_end=0.28,pixel_scale=2.*detx_scale*0.05/(60.*60.))
 
-for run in on_run_list:
-    obsID = run.split('_')[0]
-    detector = run.split('_')[1]
+for r in range(0,len(list_region)):
+    region = list_region[r]
+    mask_inner_radius = list_mask_inner_radius[r]
+    mask_outer_radius = list_mask_outer_radius[r]
+    mask_inner_detr = mask_inner_radius/(0.05/(60.*60.))
+    mask_outer_detr = mask_outer_radius/(0.05/(60.*60.))
 
-    ref_sky = []
-    ref_det = []
-    mtx_det_2_sky = []
-    mtx_sky_2_det = []
-    for idx_ra in range(0,1):
-        for idx_dec in range(0,1):
-            ref_sky_local, ref_det_local, mtx_det_2_sky_local, mtx_sky_2_det_local = LoadCoordinateMatrix(idx_ra,idx_dec,on_sample,'ID'+obsID)
-            ref_sky += [ref_sky_local]
-            ref_det += [ref_det_local]
-            mtx_det_2_sky += [mtx_det_2_sky_local]
-            mtx_sky_2_det += [mtx_sky_2_det_local]
-    mask_detx, mask_dety = ConvertSky2Det([mask_ra,mask_dec],ref_det[0],[sky_ra_center,sky_dec_center],mtx_sky_2_det[0])
-    print (f'mask_detx = {mask_detx}')
-    print (f'mask_dety = {mask_dety}')
+    image_icrs_comb_sci.reset()
+    image_icrs_comb_xry.reset()
+    image_icrs_comb_qpb.reset()
+    image_icrs_comb_spf.reset()
+    image_icrs_comb_cxb.reset()
+    spectrum_comb_sci.reset()
+    spectrum_comb_qpb.reset()
+    spectrum_comb_spf.reset()
+    spectrum_comb_cxb.reset()
+    spectrum_comb_xry.reset()
+    spectrum_comb_raw_sci.reset()
+    spectrum_comb_raw_qpb.reset()
+    spectrum_comb_raw_spf.reset()
+    spectrum_comb_raw_cxb.reset()
+    spectrum_comb_raw_xry.reset()
+    spectrum_comb_raw_bkg.reset()
+    radial_comb_sci.reset()
+    radial_comb_qpb.reset()
+    radial_comb_spf.reset()
+    radial_comb_cxb.reset()
+    radial_comb_sci.reset()
 
-    spectral_volume = analyze_one_observation(obsID,detector)
-    total_spectral_volume += spectral_volume
-
-output_dir = '/Users/rshang/xmm_analysis/output_plots/plot_%s/'%(on_sample)
-common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_sci,"%s/image_icrs_job%s_%s.png"%(output_dir,job,obsID))
-common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_sci,"%s/image_icrs_log_job%s_%s.png"%(output_dir,job,obsID),log_scale=True)
-
-image_icrs_comb_xry.add(image_icrs_comb_sci)
-image_icrs_comb_xry.add(image_icrs_comb_qpb,factor=-1.)
-image_icrs_comb_xry.add(image_icrs_comb_spf,factor=-1.)
-image_icrs_comb_xry.add(image_icrs_comb_cxb,factor=-1.)
-common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_xry,"%s/image_icrs_xry_log_job%s_%s.png"%(output_dir,job,obsID))
-
-plot_data = spectrum_comb_sci
-plot_bkg = []
-plot_color = []
-plot_label = []
-plot_bkg += [spectrum_comb_cxb]
-plot_color += [color_list[2]]
-plot_label += ['CXB']
-plot_bkg += [spectrum_comb_spf]
-plot_color += [color_list[1]]
-plot_label += ['SPF']
-plot_bkg += [spectrum_comb_qpb]
-plot_color += [color_list[0]]
-plot_label += ['QPB']
-save_name = "%s/spectrum_comb_job%s_%s.png"%(output_dir,job,obsID)
-draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
-
-MakeRadialProjection(image_icrs_comb_sci, radial_comb_sci)
-MakeRadialProjection(image_icrs_comb_qpb, radial_comb_qpb)
-MakeRadialProjection(image_icrs_comb_spf, radial_comb_spf)
-MakeRadialProjection(image_icrs_comb_cxb, radial_comb_cxb)
-
-plot_data = radial_comb_sci
-plot_bkg = []
-plot_color = []
-plot_label = []
-plot_bkg += [radial_comb_cxb]
-plot_color += [color_list[2]]
-plot_label += ['CXB']
-plot_bkg += [radial_comb_spf]
-plot_color += [color_list[1]]
-plot_label += ['SPF']
-plot_bkg += [radial_comb_qpb]
-plot_color += [color_list[0]]
-plot_label += ['QPB']
-save_name = "%s/radial_comb_job%s_%s.png"%(output_dir,job,obsID)
-draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Angular distance [deg]','Photons /cm2/s/sr/keV',save_name,True)
-
-if write_xspec_output:
-
-    print (f'total_spectral_volume = {total_spectral_volume}')
-    for ch in range(0,len(spectrum_comb_raw_cxb.xaxis)):
-        ch_energy = spectrum_comb_raw_cxb.xaxis[ch]
-        ch_rebin = spectrum_comb_cxb.get_bin(ch_energy)
-        spectrum_comb_raw_cxb.yaxis[ch] = spectrum_comb_cxb.yaxis[ch_rebin]*total_spectral_volume
-        spectrum_comb_raw_cxb.yaxis[ch] = max(0.,spectrum_comb_raw_cxb.yaxis[ch])
-    
-    plot_data = spectrum_comb_raw_sci
-    plot_bkg = []
-    plot_color = []
-    plot_label = []
-    plot_bkg += [spectrum_comb_raw_cxb]
-    plot_color += [color_list[2]]
-    plot_label += ['CXB']
-    plot_bkg += [spectrum_comb_raw_spf]
-    plot_color += [color_list[1]]
-    plot_label += ['SPF']
-    plot_bkg += [spectrum_comb_raw_qpb]
-    plot_color += [color_list[0]]
-    plot_label += ['QPB']
-    save_name = "%s/spectrum_comb_raw_job%s_%s.png"%(output_dir,job,obsID)
-    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
-    
-    spectrum_comb_raw_xry.add(spectrum_comb_raw_sci)
-    spectrum_comb_raw_xry.add(spectrum_comb_raw_qpb,factor=-1.)
-    spectrum_comb_raw_xry.add(spectrum_comb_raw_spf,factor=-1.)
-    spectrum_comb_raw_xry.add(spectrum_comb_raw_cxb,factor=-1.)
-    
-    on_exposure = 0.
-    for run in on_run_list:
-        obsID = run.split('_')[0]
-        input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/ID'+obsID
-        sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos2',ana_ccd_bins[0])
-        sci_hdu_list = fits.open(sci_filename)
-        on_exposure += sci_hdu_list[1].header['EXPOSURE']
-    
-    input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
-    hdu_list = fits.open(input_filename)
-    mytable = Table.read(input_filename, hdu=1)
-    original_nbins = len(mytable)
-    spectrum_rebin_raw_xry = MyArray1D(bin_start=0,bin_end=original_nbins,pixel_scale=1)
-    for entry in range(0,len(mytable)):
-        spectrum_rebin_raw_xry.xaxis[entry] = 0.5*(mytable[entry]['ENERG_LO']+mytable[entry]['ENERG_HI'])*1000.
-
-    # Create a FITS header template from an XMM output
-    input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-pi.fits'
-    hdu_list = fits.open(input_filename)
-    mytable = Table.read(input_filename, hdu=1)
-    original_delta_energy = spectrum_comb_raw_xry.xaxis[1]-spectrum_comb_raw_xry.xaxis[0]
-    rebin_delta_energy = spectrum_rebin_raw_xry.xaxis[1]-spectrum_rebin_raw_xry.xaxis[0]
-    rebin_energy = spectrum_comb_raw_xry.xaxis[0]
-    ch_start = spectrum_rebin_raw_xry.get_bin(rebin_energy)
-    for ch in range(ch_start,len(spectrum_rebin_raw_xry.xaxis)):
-        ch_energy = spectrum_rebin_raw_xry.xaxis[ch]
-        ch_rebin = spectrum_comb_raw_xry.get_bin(ch_energy)
-        spectrum_rebin_raw_xry.yaxis[ch] = spectrum_comb_raw_xry.yaxis[ch_rebin]*rebin_delta_energy/original_delta_energy
-    
-    fig.clf()
-    axbig = fig.add_subplot()
-    axbig.plot(spectrum_rebin_raw_xry.xaxis,spectrum_rebin_raw_xry.yaxis,color='k')
-    axbig.set_xlabel('Energy')
-    axbig.set_ylabel('Count')
-    fig.savefig("%s/spectrum_rebin_%s.png"%(output_dir,obsID),bbox_inches='tight')
-    axbig.remove()
-
-    list_chl = []
-    list_cnt = []
-    list_bkg = []
-    for ch in range(0,len(spectrum_rebin_raw_xry.xaxis)):
-        list_chl += [ch]
-        list_cnt += [spectrum_rebin_raw_xry.yaxis[ch]]
-        list_bkg += [0.]
-    
-    # Create a FITS table extension
-    col_channel = fits.Column(name='CHANNEL', array=list_chl, format='I')
-    col_count = fits.Column(name='COUNTS', array=list_cnt, format='J', unit='count')
-    col_bkgnd = fits.Column(name='COUNTS', array=list_bkg, format='J', unit='count')
-    my_spec_header = hdu_list[1].header
-    my_spec_table = fits.BinTableHDU.from_columns([col_channel,col_count],name='SPECTRUM',header=my_spec_header)
-    my_bkgd_table = fits.BinTableHDU.from_columns([col_channel,col_bkgnd],name='BACKFILE',header=my_spec_header)
-    
-    arf_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
-    my_arf_hdu = fits.open(arf_filename)[1]
-    my_arf_hdu.name = 'ANCRFILE'
-    rmf_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-rmf.fits'
-    my_rmf_hdu = fits.open(rmf_filename)[1]
-    my_rmf_hdu.name = 'RESPFILE'
-
-    # Combine the primary and table extensions
-    print ('write output to %s/table_spectrum_%s.fits'%(output_dir,obsID))
-    hdul = fits.HDUList([hdu_list[0], my_spec_table])
-    hdul.append(my_bkgd_table)
-    hdul.append(my_arf_hdu)
-    hdul.append(my_rmf_hdu)
-    hdul.writeto('%s/table_spectrum_%s.fits'%(output_dir,obsID), overwrite=True)
-        
-    input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
-    output_filename = '%s/table_arf_%s.fits'%(output_dir,obsID)
-    shutil.copyfile(input_filename, output_filename)
-
-    input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-rmf.fits'
-    output_filename = '%s/table_rmf_%s.fits'%(output_dir,obsID)
-    shutil.copyfile(input_filename, output_filename)
-
+    main()
 
 
