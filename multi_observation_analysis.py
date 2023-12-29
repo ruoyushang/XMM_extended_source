@@ -990,6 +990,9 @@ def main():
     MakeRadialProjection(image_icrs_comb_spf, radial_comb_spf)
     MakeRadialProjection(image_icrs_comb_cxb, radial_comb_cxb)
     
+    cxb_error_ratio = np.sum(spectrum_comb_cxb.yerr)/np.sum(spectrum_comb_cxb.yaxis)
+    for entry in range(0,len(radial_comb_cxb.yaxis)):
+        radial_comb_cxb.yerr[entry] = radial_comb_cxb.yaxis[entry]*cxb_error_ratio
     plot_data = radial_comb_sci
     plot_bkg = []
     plot_color = []
@@ -1047,9 +1050,13 @@ def main():
         for run in on_run_list:
             obsID = run.split('_')[0]
             input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
+            sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos1',ana_ccd_bins[0])
+            sci_hdu_list = fits.open(sci_filename)
+            on_exposure += sci_hdu_list[1].header['EXPOSURE']
             sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos2',ana_ccd_bins[0])
             sci_hdu_list = fits.open(sci_filename)
             on_exposure += sci_hdu_list[1].header['EXPOSURE']
+        print (f'Total exposure = {on_exposure}')
         
         input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
         hdu_list = fits.open(input_filename)
@@ -1126,17 +1133,27 @@ def main():
         output_filename = '%s/table_rmf_%s_%s.fits'%(output_dir,obsID,region)
         shutil.copyfile(input_filename, output_filename)
 
-use_det_coord = True
+#use_det_coord = True
+use_det_coord = False
 mask_detx = -350.
 mask_dety = -350.
 
 region = 'r0'
-mask_inner_radius = 0.0
+#mask_inner_radius = 0.0
+#mask_outer_radius = 0.015
+mask_inner_radius = 0.015
 mask_outer_radius = 0.3
 
 list_region = []
 list_mask_inner_radius = []
 list_mask_outer_radius = []
+list_region += [region]
+list_mask_inner_radius += [mask_inner_radius]
+list_mask_outer_radius += [mask_outer_radius]
+
+# Geminga
+mask_ra = 98.4760
+mask_dec = 17.7689
 
 # Cas A
 #mask_ra = 350.8075+0.05
@@ -1169,26 +1186,26 @@ list_mask_outer_radius = []
 #mask_dec = 18.8708889
 
 # Be/X-ray binary system EXO 2030+375
-mask_ra = 308.0637083
-mask_dec = 37.6375000
+#mask_ra = 308.0637083
+#mask_dec = 37.6375000
 #list_region += ['r0']
 #list_mask_inner_radius += [0.0]
 #list_mask_outer_radius += [0.3]
-list_region += ['r0']
-list_mask_inner_radius += [0.0]
-list_mask_outer_radius += [0.05]
-list_region += ['r1']
-list_mask_inner_radius += [0.05]
-list_mask_outer_radius += [0.1]
-list_region += ['r2']
-list_mask_inner_radius += [0.1]
-list_mask_outer_radius += [0.15]
-list_region += ['r3']
-list_mask_inner_radius += [0.15]
-list_mask_outer_radius += [0.2]
-list_region += ['r4']
-list_mask_inner_radius += [0.2]
-list_mask_outer_radius += [0.25]
+#list_region += ['r0']
+#list_mask_inner_radius += [0.0]
+#list_mask_outer_radius += [0.05]
+#list_region += ['r1']
+#list_mask_inner_radius += [0.05]
+#list_mask_outer_radius += [0.1]
+#list_region += ['r2']
+#list_mask_inner_radius += [0.1]
+#list_mask_outer_radius += [0.15]
+#list_region += ['r3']
+#list_mask_inner_radius += [0.15]
+#list_mask_outer_radius += [0.2]
+#list_region += ['r4']
+#list_mask_inner_radius += [0.2]
+#list_mask_outer_radius += [0.25]
 
 sky_ra_lower, sky_dec_lower, sky_ra_upper, sky_dec_upper, sky_ra_center, sky_dec_center = get_observation_pointings(on_run_list)
 sky_l_center, sky_b_center = ConvertRaDecToGalactic(sky_ra_center, sky_dec_center)
