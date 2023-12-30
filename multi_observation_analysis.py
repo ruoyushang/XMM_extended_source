@@ -22,6 +22,7 @@ on_obsID = sys.argv[2]
 job = sys.argv[3]
 ana_tag = sys.argv[4]
 
+
 #measure_cxb = True
 measure_cxb = False
 
@@ -50,7 +51,12 @@ if measure_cxb:
 
 show_log_spectrum = True
 
-write_xspec_output = True
+do_energy_flux = True
+write_xspec_output = False
+my_spectrum_unit = 'erg/cm2/s/sr'
+#do_energy_flux = False # use this if you need xspec output
+#write_xspec_output = True
+#my_spectrum_unit = 'Photons /cm2/s/sr/keV'
 
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
@@ -320,7 +326,7 @@ def find_point_sources_with_gravity(mode,image_data,image_mask,threshold=5.0):
 
     return hist_gravity
 
-def draw_stacked_histogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,ylabel,plot_name,log_scale=False):
+def draw_stacked_histogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,ylabel,plot_name,plot_name_ul,log_scale=False):
 
     n_bins = len(hist_data.xaxis)
     stack_bkg = []
@@ -329,6 +335,12 @@ def draw_stacked_histogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,y
         for h2 in range(h1,len(hist_bkg)):
             stack_bkg[h1].add(hist_bkg[h2])
     
+    min_data = 1e10
+    for x in range(0,len(hist_data.xaxis)):
+        if hist_data.yaxis[x]<=0.: continue
+        if hist_data.yaxis[x]<min_data:
+            min_data = hist_data.yaxis[x]
+
     avg_qpb = 0.
     bin_count = 0.
     if log_scale:
@@ -351,13 +363,25 @@ def draw_stacked_histogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,y
     axbig.errorbar(hist_data.xaxis,hist_data.yaxis,yerr=hist_data.yerr,color='k',label='Data')
     if log_scale:
         axbig.set_yscale('log')
-        axbig.set_ylim(bottom=0.5*avg_qpb)
+        axbig.set_ylim(bottom=0.5*min_data)
     if 'spectrum' in plot_name:
         axbig.set_xscale('log')
     axbig.set_xlabel(xlabel)
     axbig.set_ylabel(ylabel)
     axbig.legend(loc='best')
     fig.savefig("%s"%(plot_name),bbox_inches='tight')
+    axbig.remove()
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.plot(stack_bkg[0].xaxis,3.*stack_bkg[0].yerr,color='k')
+    if log_scale:
+        axbig.set_yscale('log')
+    if 'spectrum' in plot_name:
+        axbig.set_xscale('log')
+    axbig.set_xlabel(xlabel)
+    axbig.set_ylabel(ylabel)
+    fig.savefig("%s"%(plot_name_ul),bbox_inches='tight')
     axbig.remove()
 
 def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=''):
@@ -618,7 +642,9 @@ def analyze_one_observation(obsID,detector):
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[0])
     sci_hdu_list = fits.open(sci_filename)
     exposure = sci_hdu_list[1].header['EXPOSURE']
-    spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[aeff_r].yaxis[0]
+    keV_to_erg = 1.60218e-9
+    spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[aeff_r].yaxis[0]*keV_to_erg
+    spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]*keV_to_erg
     print (f'area = {area_curve[aeff_r].yaxis[0]}')
     print (f'exposure = {exposure}')
     print (f'spectral_volume = {spectral_volume}')
@@ -646,8 +672,9 @@ def analyze_one_observation(obsID,detector):
             evt_dec = sci_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
-            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]
-            image_det_all.fill(evt_detx,evt_dety,weight=1./spacial_volume)
+            convert_to_energy_flux = pow(evt_pi/1000.,2)*keV_to_erg*keV_to_erg
+            if not do_energy_flux: convert_to_energy_flux = 1.
+            image_det_all.fill(evt_detx,evt_dety,weight=1./spacial_volume*convert_to_energy_flux)
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -655,13 +682,13 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             delta_ra = evt_ra - sky_ra_center
             delta_dec = evt_dec - sky_dec_center
-            spectrum_sci.fill(evt_pi,weight=1./spectral_volume)
-            spectrum_comb_sci.fill(evt_pi,weight=1./spectral_volume*1./len_run_list)
+            spectrum_sci.fill(evt_pi,weight=1./spectral_volume*convert_to_energy_flux)
+            spectrum_comb_sci.fill(evt_pi,weight=1./spectral_volume*1./len_run_list*convert_to_energy_flux)
             if write_xspec_output:
                 spectrum_comb_raw_sci.fill(evt_pi)
-            image_icrs_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume)
-            image_icrs_comb_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./len_run_list)
-            image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_volume)
+            image_icrs_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*convert_to_energy_flux)
+            image_icrs_comb_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./len_run_list*convert_to_energy_flux)
+            image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_volume*convert_to_energy_flux)
 
         qpb_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         qpb_hdu_list = fits.open(qpb_filename)
@@ -674,9 +701,10 @@ def analyze_one_observation(obsID,detector):
             evt_dec = qpb_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
+            convert_to_energy_flux = pow(evt_pi/1000.,2)*keV_to_erg*keV_to_erg
+            if not do_energy_flux: convert_to_energy_flux = 1.
             radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
             radial_acceptance = area_curve[radius].yaxis[0]/area_curve[aeff_r].yaxis[0]
-            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -684,16 +712,16 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             delta_ra = evt_ra - sky_ra_center
             delta_dec = evt_dec - sky_dec_center
-            spectrum_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale)
-            spectrum_comb_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list)
+            spectrum_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*convert_to_energy_flux)
+            spectrum_comb_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list*convert_to_energy_flux)
             if write_xspec_output:
                 spectrum_comb_raw_qpb.fill(evt_pi,weight=1./sample_scale)
-            image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale)
-            image_icrs_comb_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list)
-            image_icrs_cxb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance)
-            spectrum_qpb_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance)
-            image_det_qpb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale)
-            image_det_cxb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance)
+            image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*convert_to_energy_flux)
+            image_icrs_comb_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list*convert_to_energy_flux)
+            image_icrs_cxb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance*convert_to_energy_flux)
+            spectrum_qpb_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance*convert_to_energy_flux)
+            image_det_qpb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*convert_to_energy_flux)
+            image_det_cxb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance*convert_to_energy_flux)
 
         spf_filename = '%s/spf_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         spf_hdu_list = fits.open(spf_filename)
@@ -706,10 +734,11 @@ def analyze_one_observation(obsID,detector):
             evt_dec = spf_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
+            convert_to_energy_flux = pow(evt_pi/1000.,2)*keV_to_erg*keV_to_erg
+            if not do_energy_flux: convert_to_energy_flux = 1.
             radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
             #radial_acceptance = area_curve[radius].yaxis[0]/area_curve[aeff_r].yaxis[0]
             radial_acceptance = 1.
-            spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -717,13 +746,13 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             delta_ra = evt_ra - sky_ra_center
             delta_dec = evt_dec - sky_dec_center
-            spectrum_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale)
-            spectrum_spf_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance)
-            spectrum_comb_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list)
+            spectrum_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*convert_to_energy_flux)
+            spectrum_spf_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance*convert_to_energy_flux)
+            spectrum_comb_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list*convert_to_energy_flux)
             if write_xspec_output:
                 spectrum_comb_raw_spf.fill(evt_pi,weight=1./sample_scale)
-            image_icrs_spf.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*radial_acceptance)
-            image_det_spf.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*radial_acceptance)
+            image_icrs_spf.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*radial_acceptance*convert_to_energy_flux)
+            image_det_spf.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*radial_acceptance*convert_to_energy_flux)
 
     spf_cnt = spectrum_spf.integral()
     spf_radial_cnt = spectrum_spf_radial.integral()
@@ -872,7 +901,8 @@ def analyze_one_observation(obsID,detector):
     plot_color += [color_list[0]]
     plot_label += ['QPB']
     save_name = "%s/spectrum_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region)
-    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
+    save_name_ul = "%s/spectrum_ul_job%s_%s_%s_%s.png"%(output_dir,job,obsID,detector,region)
+    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]',my_spectrum_unit,save_name,save_name_ul,show_log_spectrum)
 
     return spectral_volume
     
@@ -983,7 +1013,8 @@ def main():
     plot_color += [color_list[0]]
     plot_label += ['QPB']
     save_name = "%s/spectrum_comb_job%s_%s_%s.png"%(output_dir,job,obsID,region)
-    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
+    save_name_ul = "%s/spectrum_comb_ul_job%s_%s_%s.png"%(output_dir,job,obsID,region)
+    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]',my_spectrum_unit,save_name,save_name_ul,show_log_spectrum)
     
     MakeRadialProjection(image_icrs_comb_sci, radial_comb_sci)
     MakeRadialProjection(image_icrs_comb_qpb, radial_comb_qpb)
@@ -1007,7 +1038,8 @@ def main():
     plot_color += [color_list[0]]
     plot_label += ['QPB']
     save_name = "%s/radial_comb_job%s_%s_%s.png"%(output_dir,job,obsID,region)
-    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Angular distance [deg]','Photons /cm2/s/sr/keV',save_name,True)
+    save_name_ul = "%s/radial_comb_ul_job%s_%s_%s.png"%(output_dir,job,obsID,region)
+    draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Angular distance [deg]',my_spectrum_unit,save_name,save_name_ul,True)
     
     spectrum_comb_raw_xry.add(spectrum_comb_raw_sci)
     spectrum_comb_raw_xry.add(spectrum_comb_raw_qpb,factor=-1.)
@@ -1020,6 +1052,28 @@ def main():
     output_filename = f'{output_dir}/spectrum_{obsID}_{region}.pkl'
     with open(output_filename,"wb") as file:
         pickle.dump(spectrum_comb_raw_xry, file)
+
+    spectrum_comb_bkg.add(spectrum_comb_cxb)
+    spectrum_comb_bkg.add(spectrum_comb_spf)
+    spectrum_comb_bkg.add(spectrum_comb_qpb)
+    list_chl = []
+    list_ul = []
+    for ch in range(0,len(spectrum_comb_sci.xaxis)):
+        data = spectrum_comb_sci.yaxis[ch]
+        bkg = spectrum_comb_bkg.yaxis[ch]
+        err = spectrum_comb_bkg.yerr[ch]
+        list_chl += [ch]
+        list_ul += [3.*err]
+    col_channel = fits.Column(name='CHANNEL', array=list_chl, format='I')
+    col_upperlimit = fits.Column(name='UL', array=list_ul, format='J', unit=my_spectrum_unit)
+    # Create a FITS header template from an XMM output
+    input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-pi.fits'
+    hdu_list = fits.open(input_filename)
+    my_spec_header = hdu_list[1].header
+    my_spec_table = fits.BinTableHDU.from_columns([col_channel,col_upperlimit],name='SPECTRUM',header=my_spec_header)
+    hdul = fits.HDUList([hdu_list[0], my_spec_table])
+    print ('write output to %s/table_upper_limit_%s_%s.fits'%(output_dir,obsID,region))
+    hdul.writeto('%s/table_upper_limit_%s_%s.fits'%(output_dir,obsID,region), overwrite=True)
     
     if write_xspec_output:
     
@@ -1044,7 +1098,8 @@ def main():
         plot_color += [color_list[0]]
         plot_label += ['QPB']
         save_name = "%s/spectrum_comb_raw_job%s_%s_%s.png"%(output_dir,job,obsID,region)
-        draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]','Photons /cm2/s/sr/keV',save_name,show_log_spectrum)
+        save_name_ul = "%s/spectrum_comb_raw_ul_job%s_%s_%s.png"%(output_dir,job,obsID,region)
+        draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]',my_spectrum_unit,save_name,save_name_ul,show_log_spectrum)
         
         on_exposure = 0.
         for run in on_run_list:
@@ -1228,6 +1283,7 @@ image_icrs_comb_qpb = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_siz
 image_icrs_comb_spf = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
 image_icrs_comb_cxb = MyArray2D(start_x=sky_ra_low,start_y=sky_dec_low,image_size=image_icrs_size,pixel_scale=detx_scale*0.05/(60.*60.))
 spectrum_comb_sci = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_bkg = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_qpb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_spf = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_cxb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
@@ -1257,6 +1313,7 @@ for r in range(0,len(list_region)):
     image_icrs_comb_spf.reset()
     image_icrs_comb_cxb.reset()
     spectrum_comb_sci.reset()
+    spectrum_comb_bkg.reset()
     spectrum_comb_qpb.reset()
     spectrum_comb_spf.reset()
     spectrum_comb_cxb.reset()
