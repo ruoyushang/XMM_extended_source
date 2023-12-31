@@ -51,7 +51,7 @@ if measure_cxb:
 
 show_log_spectrum = True
 
-do_energy_flux = True
+do_energy_flux = True # use this to enable acceptance correction
 write_xspec_output = False
 my_spectrum_unit = 'erg/cm2/s/sr'
 #do_energy_flux = False # use this if you need xspec output
@@ -61,16 +61,15 @@ my_spectrum_unit = 'erg/cm2/s/sr'
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 
-#energy_cut_lower = 1000
-energy_cut_lower = 1700
+energy_cut_lower = 500
+#energy_cut_lower = 1700
 energy_cut_upper = 8000
 #energy_cut_upper = 12000
 
 on_exposure = 0.
 total_spectral_volume = 0.
 
-energy_array = [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
-
+#energy_array = [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 #delta_energy = energy_array[1]-energy_array[0]
 #cxb_delta_energy = delta_energy/4.
 #cxb_energy_array = []
@@ -672,8 +671,12 @@ def analyze_one_observation(obsID,detector):
             evt_dec = sci_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
-            convert_to_energy_flux = pow(evt_pi/1000.,2)*keV_to_erg*keV_to_erg
-            if not do_energy_flux: convert_to_energy_flux = 1.
+            radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
+            convert_to_energy_flux = 1.
+            unfolding_acceptance = 1.
+            if do_energy_flux: 
+                convert_to_energy_flux = pow(evt_pi/1000.,2)*keV_to_erg*keV_to_erg
+                unfolding_acceptance = area_curve[aeff_r].yaxis[0]/area_curve[radius].get_bin_content(evt_pi)
             image_det_all.fill(evt_detx,evt_dety,weight=1./spacial_volume*convert_to_energy_flux)
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
@@ -682,13 +685,13 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             delta_ra = evt_ra - sky_ra_center
             delta_dec = evt_dec - sky_dec_center
-            spectrum_sci.fill(evt_pi,weight=1./spectral_volume*convert_to_energy_flux)
-            spectrum_comb_sci.fill(evt_pi,weight=1./spectral_volume*1./len_run_list*convert_to_energy_flux)
+            spectrum_sci.fill(evt_pi,weight=1./spectral_volume*convert_to_energy_flux*unfolding_acceptance)
+            spectrum_comb_sci.fill(evt_pi,weight=1./spectral_volume*1./len_run_list*convert_to_energy_flux*unfolding_acceptance)
             if write_xspec_output:
                 spectrum_comb_raw_sci.fill(evt_pi)
-            image_icrs_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*convert_to_energy_flux)
-            image_icrs_comb_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./len_run_list*convert_to_energy_flux)
-            image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_volume*convert_to_energy_flux)
+            image_icrs_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*convert_to_energy_flux*unfolding_acceptance)
+            image_icrs_comb_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./len_run_list*convert_to_energy_flux*unfolding_acceptance)
+            image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_volume*convert_to_energy_flux*unfolding_acceptance)
 
         qpb_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         qpb_hdu_list = fits.open(qpb_filename)
@@ -701,10 +704,13 @@ def analyze_one_observation(obsID,detector):
             evt_dec = qpb_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
-            convert_to_energy_flux = pow(evt_pi/1000.,2)*keV_to_erg*keV_to_erg
-            if not do_energy_flux: convert_to_energy_flux = 1.
             radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
-            radial_acceptance = area_curve[radius].yaxis[0]/area_curve[aeff_r].yaxis[0]
+            convert_to_energy_flux = 1.
+            unfolding_acceptance = 1.
+            if do_energy_flux: 
+                convert_to_energy_flux = pow(evt_pi/1000.,2)*keV_to_erg*keV_to_erg
+                unfolding_acceptance = area_curve[aeff_r].yaxis[0]/area_curve[radius].get_bin_content(evt_pi)
+            radial_acceptance = area_curve[radius].get_bin_content(evt_pi)/area_curve[aeff_r].yaxis[0]
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -712,16 +718,16 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             delta_ra = evt_ra - sky_ra_center
             delta_dec = evt_dec - sky_dec_center
-            spectrum_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*convert_to_energy_flux)
-            spectrum_comb_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list*convert_to_energy_flux)
+            spectrum_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*convert_to_energy_flux*unfolding_acceptance)
+            spectrum_comb_qpb.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list*convert_to_energy_flux*unfolding_acceptance)
             if write_xspec_output:
                 spectrum_comb_raw_qpb.fill(evt_pi,weight=1./sample_scale)
-            image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*convert_to_energy_flux)
-            image_icrs_comb_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list*convert_to_energy_flux)
-            image_icrs_cxb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance*convert_to_energy_flux)
-            spectrum_qpb_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance*convert_to_energy_flux)
-            image_det_qpb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*convert_to_energy_flux)
-            image_det_cxb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance*convert_to_energy_flux)
+            image_icrs_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*convert_to_energy_flux*unfolding_acceptance)
+            image_icrs_comb_qpb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list*convert_to_energy_flux*unfolding_acceptance)
+            image_icrs_cxb.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance*convert_to_energy_flux*unfolding_acceptance)
+            spectrum_qpb_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance*convert_to_energy_flux*unfolding_acceptance)
+            image_det_qpb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*convert_to_energy_flux*unfolding_acceptance)
+            image_det_cxb.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*1./len_run_list*radial_acceptance*convert_to_energy_flux*unfolding_acceptance)
 
         spf_filename = '%s/spf_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[ccd])
         spf_hdu_list = fits.open(spf_filename)
@@ -734,11 +740,12 @@ def analyze_one_observation(obsID,detector):
             evt_dec = spf_table[entry]['DEC']
             if evt_pi<energy_cut_lower: continue
             if evt_pi>energy_cut_upper: continue
-            convert_to_energy_flux = pow(evt_pi/1000.,2)*keV_to_erg*keV_to_erg
-            if not do_energy_flux: convert_to_energy_flux = 1.
             radius = int(pow(evt_detx*evt_detx+evt_dety*evt_dety,0.5)/5000.)
-            #radial_acceptance = area_curve[radius].yaxis[0]/area_curve[aeff_r].yaxis[0]
-            radial_acceptance = 1.
+            convert_to_energy_flux = 1.
+            unfolding_acceptance = 1.
+            if do_energy_flux: 
+                convert_to_energy_flux = pow(evt_pi/1000.,2)*keV_to_erg*keV_to_erg
+                unfolding_acceptance = area_curve[aeff_r].yaxis[0]/area_curve[radius].get_bin_content(evt_pi)
             mask = image_det_mask.get_bin_content(evt_detx,evt_dety)
             if not select_mask_events:
                 if mask==1: continue
@@ -746,13 +753,13 @@ def analyze_one_observation(obsID,detector):
                 if mask!=1: continue
             delta_ra = evt_ra - sky_ra_center
             delta_dec = evt_dec - sky_dec_center
-            spectrum_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*convert_to_energy_flux)
-            spectrum_spf_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*radial_acceptance*convert_to_energy_flux)
-            spectrum_comb_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list*convert_to_energy_flux)
+            spectrum_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*convert_to_energy_flux*unfolding_acceptance)
+            spectrum_spf_radial.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*convert_to_energy_flux*unfolding_acceptance)
+            spectrum_comb_spf.fill(evt_pi,weight=1./spectral_volume*1./sample_scale*1./len_run_list*convert_to_energy_flux*unfolding_acceptance)
             if write_xspec_output:
                 spectrum_comb_raw_spf.fill(evt_pi,weight=1./sample_scale)
-            image_icrs_spf.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*radial_acceptance*convert_to_energy_flux)
-            image_det_spf.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*radial_acceptance*convert_to_energy_flux)
+            image_icrs_spf.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./sample_scale*convert_to_energy_flux*unfolding_acceptance)
+            image_det_spf.fill(evt_detx,evt_dety,weight=1./spacial_volume*1./sample_scale*convert_to_energy_flux*unfolding_acceptance)
 
     spf_cnt = spectrum_spf.integral()
     spf_radial_cnt = spectrum_spf_radial.integral()
