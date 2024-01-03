@@ -23,6 +23,13 @@ job = sys.argv[3]
 ana_tag = sys.argv[4]
 
 
+do_energy_flux = True # use this to enable acceptance correction
+write_xspec_output = False
+my_spectrum_unit = 'erg/cm2/s/sr'
+#do_energy_flux = False # use this if you need xspec output
+#write_xspec_output = True
+#my_spectrum_unit = 'Photons /cm2/s/sr/keV'
+
 #measure_cxb = True
 measure_cxb = False
 
@@ -51,17 +58,11 @@ if measure_cxb:
 
 show_log_spectrum = True
 
-do_energy_flux = True # use this to enable acceptance correction
-write_xspec_output = False
-my_spectrum_unit = 'erg/cm2/s/sr'
-#do_energy_flux = False # use this if you need xspec output
-#write_xspec_output = True
-#my_spectrum_unit = 'Photons /cm2/s/sr/keV'
-
 ana_ccd_bins = [0]
 #ana_ccd_bins = [1,2,3,4,5,6,7]
 
 energy_cut_lower = 500
+#energy_cut_upper = 1400
 #energy_cut_lower = 1700
 energy_cut_upper = 8000
 #energy_cut_upper = 12000
@@ -340,19 +341,19 @@ def draw_stacked_histogram(fig,hist_data,hist_bkg,bkg_colors,bkg_labels,xlabel,y
         if hist_data.yaxis[x]<min_data:
             min_data = hist_data.yaxis[x]
 
-    avg_qpb = 0.
-    bin_count = 0.
-    if log_scale:
-        for x in range(0,len(hist_bkg[len(hist_bkg)-1].xaxis)):
-            energy = hist_bkg[len(hist_bkg)-1].xaxis[x]
-            if 'spectrum' in plot_name:
-                if energy>2000:
-                    avg_qpb += hist_bkg[len(hist_bkg)-1].yaxis[x]
-                    bin_count += 1.
-            else:
-                avg_qpb += hist_bkg[len(hist_bkg)-1].yaxis[x]
-                bin_count += 1.
-        avg_qpb = avg_qpb/bin_count
+    #avg_qpb = 0.
+    #bin_count = 0.
+    #if log_scale:
+    #    for x in range(0,len(hist_bkg[len(hist_bkg)-1].xaxis)):
+    #        energy = hist_bkg[len(hist_bkg)-1].xaxis[x]
+    #        if 'spectrum' in plot_name:
+    #            if energy>2000:
+    #                avg_qpb += hist_bkg[len(hist_bkg)-1].yaxis[x]
+    #                bin_count += 1.
+    #        else:
+    #            avg_qpb += hist_bkg[len(hist_bkg)-1].yaxis[x]
+    #            bin_count += 1.
+    #    avg_qpb = avg_qpb/bin_count
 
     fig.clf()
     axbig = fig.add_subplot()
@@ -687,8 +688,7 @@ def analyze_one_observation(obsID,detector):
             delta_dec = evt_dec - sky_dec_center
             spectrum_sci.fill(evt_pi,weight=1./spectral_volume*convert_to_energy_flux*unfolding_acceptance)
             spectrum_comb_sci.fill(evt_pi,weight=1./spectral_volume*1./len_run_list*convert_to_energy_flux*unfolding_acceptance)
-            if write_xspec_output:
-                spectrum_comb_raw_sci.fill(evt_pi)
+            spectrum_comb_raw_sci.fill(evt_pi)
             image_icrs_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*convert_to_energy_flux*unfolding_acceptance)
             image_icrs_comb_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./len_run_list*convert_to_energy_flux*unfolding_acceptance)
             image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_volume*convert_to_energy_flux*unfolding_acceptance)
@@ -1005,6 +1005,36 @@ def main():
     image_icrs_comb_xry.add(image_icrs_comb_spf,factor=-1.)
     image_icrs_comb_xry.add(image_icrs_comb_cxb,factor=-1.)
     common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_xry,"%s/image_icrs_xry_log_job%s_%s_%s.png"%(output_dir,job,obsID,region))
+
+    for ch in range(0,len(spectrum_comb_sci.xaxis)):
+        raw_cnt = spectrum_comb_raw_sci.yaxis[ch]
+        if raw_cnt==0.: continue
+        stat_err = pow(raw_cnt,0.5)
+        flux = spectrum_comb_sci.yaxis[ch]
+        flux_err = flux*stat_err/raw_cnt
+        spectrum_comb_sci.yerr[ch] = flux_err
+
+    n_channels = float(len(spectrum_comb_sci.xaxis))
+    sum_data_flux = np.sum(spectrum_comb_sci.yaxis)
+    sum_data_flux_err = np.sum(spectrum_comb_sci.yerr)
+    avg_data_flux = sum_data_flux/n_channels
+    avg_data_flux_err = sum_data_flux_err/n_channels
+    print (f'avg_data_flux = {avg_data_flux:0.2e}, avg_data_flux_err = {avg_data_flux_err:0.2e}')
+    sum_cxb_flux = np.sum(spectrum_comb_cxb.yaxis)
+    sum_cxb_flux_err = np.sum(spectrum_comb_cxb.yerr)
+    avg_cxb_flux = sum_cxb_flux/n_channels
+    avg_cxb_flux_err = sum_cxb_flux_err/n_channels
+    print (f'avg_cxb_flux = {avg_cxb_flux:0.2e}, avg_cxb_flux_err = {avg_cxb_flux_err:0.2e}')
+    sum_qpb_flux = np.sum(spectrum_comb_qpb.yaxis)
+    sum_qpb_flux_err = np.sum(spectrum_comb_qpb.yerr)
+    avg_qpb_flux = sum_qpb_flux/n_channels
+    avg_qpb_flux_err = sum_qpb_flux_err/n_channels
+    print (f'avg_qpb_flux = {avg_qpb_flux:0.2e}, avg_qpb_flux_err = {avg_qpb_flux_err:0.2e}')
+    sum_spf_flux = np.sum(spectrum_comb_spf.yaxis)
+    sum_spf_flux_err = np.sum(spectrum_comb_spf.yerr)
+    avg_spf_flux = sum_spf_flux/n_channels
+    avg_spf_flux_err = sum_spf_flux_err/n_channels
+    print (f'avg_spf_flux = {avg_spf_flux:0.2e}, avg_spf_flux_err = {avg_spf_flux_err:0.2e}')
     
     plot_data = spectrum_comb_sci
     plot_bkg = []
@@ -1082,6 +1112,18 @@ def main():
     print ('write output to %s/table_upper_limit_%s_%s.fits'%(output_dir,obsID,region))
     hdul.writeto('%s/table_upper_limit_%s_%s.fits'%(output_dir,obsID,region), overwrite=True)
     
+    on_exposure = 0.
+    for run in on_run_list:
+        obsID = run.split('_')[0]
+        input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
+        sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos1',ana_ccd_bins[0])
+        sci_hdu_list = fits.open(sci_filename)
+        on_exposure += sci_hdu_list[1].header['EXPOSURE']
+        sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos2',ana_ccd_bins[0])
+        sci_hdu_list = fits.open(sci_filename)
+        on_exposure += sci_hdu_list[1].header['EXPOSURE']
+    print (f'Total exposure = {on_exposure}')
+        
     if write_xspec_output:
     
         print (f'total_spectral_volume = {total_spectral_volume}')
@@ -1107,18 +1149,6 @@ def main():
         save_name = "%s/spectrum_comb_raw_job%s_%s_%s.png"%(output_dir,job,obsID,region)
         save_name_ul = "%s/spectrum_comb_raw_ul_job%s_%s_%s.png"%(output_dir,job,obsID,region)
         draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]',my_spectrum_unit,save_name,save_name_ul,show_log_spectrum)
-        
-        on_exposure = 0.
-        for run in on_run_list:
-            obsID = run.split('_')[0]
-            input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
-            sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos1',ana_ccd_bins[0])
-            sci_hdu_list = fits.open(sci_filename)
-            on_exposure += sci_hdu_list[1].header['EXPOSURE']
-            sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos2',ana_ccd_bins[0])
-            sci_hdu_list = fits.open(sci_filename)
-            on_exposure += sci_hdu_list[1].header['EXPOSURE']
-        print (f'Total exposure = {on_exposure}')
         
         input_filename = '/Users/rshang/xmm_analysis/'+on_sample+'/ID'+obsID+'/analysis/mos2-fov-r0-arf.fits'
         hdu_list = fits.open(input_filename)
