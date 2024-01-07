@@ -312,6 +312,7 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
     #evt_l_list = []
     #evt_b_list = []
     evt_pi_list = []
+    evt_pattern_list = []
 
     for evt in range(0,len(events)):
 
@@ -406,6 +407,7 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
         #evt_l_list += [evt_l]
         #evt_b_list += [evt_b]
         evt_pi_list += [evt_pi]
+        evt_pattern_list += [evt_pattern]
 
         evt_count += 1.
         lightcurve_array.fill((evt_time-time_start)/(time_end-time_start))
@@ -426,8 +428,8 @@ def read_event_file(filename,arf_name,mask_lc=None,mask_map=None,write_events=Fa
         #col_l = fits.Column(name='GalL', array=evt_l_list, format='D')
         #col_b = fits.Column(name='GalB', array=evt_b_list, format='D')
         col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
-        #my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_l,col_b,col_pi],name='EVENT')
-        my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENTS')
+        col_pattern = fits.Column(name='PATTERN', array=evt_pattern_list, format='I')
+        my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi,col_pattern],name='EVENTS')
         my_table.header['REF_RA'] = ref_sky[0][0]
         my_table.header['REF_DEC'] = ref_sky[0][1]
         my_table.header['EXPOSURE'] = obs_duration
@@ -1494,6 +1496,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     time_expo_fwc_cor = on_duration_fwc_cor*time_pix_frac_fwc_cor
 
     fwc_2_sci_ratio = on_image_sci_cor[0].integral()/on_image_fwc_cor[0].integral()
+    on_cor_2_fov_ratio = on_image_sci_cor[0].integral()/on_image_sci_fov[0].integral()
     print ('After timecut, ON data fwc_2_sci_ratio = %s'%(fwc_2_sci_ratio))
     
     on_lightcurve_sci_cor.scale(area_pix_frac_fwc_fov/area_pix_frac_fwc_cor)
@@ -1746,7 +1749,7 @@ def analyze_a_ccd_chip(energy_range=[200,12000],ccd_id=0):
     output_detx = [on_detx_sci_fov[0],on_detx_sci_fov_bkg_sum,sp_detx_fov_template_sum,qpb_detx_fov_template_sum]
     output_image = [on_image_sci_fov[0],on_image_sci_fov_bkg_sum,sp_image_fov_template_sum,qpb_image_fov_template_sum]
 
-    return output_spectrum, output_detx, output_image
+    return output_spectrum, output_detx, output_image, on_cor_2_fov_ratio
 
 
 sci_spectrum_sum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
@@ -1772,7 +1775,7 @@ qpb_image_sum = MyArray2D()
 sp_image_sum = MyArray2D()
 
 for ccd in range(0,len(ana_ccd_bins)):
-    ana_output_spectrum, ana_output_detx, ana_output_image = analyze_a_ccd_chip(energy_range=energy_array,ccd_id=ana_ccd_bins[ccd])
+    ana_output_spectrum, ana_output_detx, ana_output_image, on_cor_2_fov_ratio = analyze_a_ccd_chip(energy_range=energy_array,ccd_id=ana_ccd_bins[ccd])
 
     #prob_bkg_spectrum = MyArray1D(bin_start=ch_low,bin_end=ch_high,pixel_scale=ch_scale)
     #prob_bkg_spectrum.add(ana_output_spectrum[1])
@@ -1900,6 +1903,7 @@ for ccd in range(0,len(ana_ccd_bins)):
     col_pi = fits.Column(name='PI', array=evt_pi_list, format='D')
     #my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_l,col_b,col_pi],name='EVENT')
     my_table = fits.BinTableHDU.from_columns([col_detx,col_dety,col_ra,col_dec,col_pi],name='EVENTS')
+    my_table.header['COR2FOV'] = on_cor_2_fov_ratio
     my_table.writeto('%s/qpb_events_%s_ccd%s.fits'%(output_dir,detector,ana_ccd_bins[ccd]), overwrite=True)
 
     sci_spectrum_sum.add(ana_output_spectrum[0])

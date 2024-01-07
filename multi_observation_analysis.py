@@ -23,12 +23,12 @@ job = sys.argv[3]
 ana_tag = sys.argv[4]
 
 
-do_energy_flux = True # use this to enable acceptance correction
-write_xspec_output = False
-my_spectrum_unit = 'erg/cm2/s/sr'
-#do_energy_flux = False # use this if you need xspec output
-#write_xspec_output = True
-#my_spectrum_unit = 'Photons /cm2/s/sr/keV'
+#do_energy_flux = True # use this to enable acceptance correction
+#write_xspec_output = False
+#my_spectrum_unit = 'erg/cm2/s/sr'
+do_energy_flux = False # use this if you need xspec output
+write_xspec_output = True
+my_spectrum_unit = 'Photons /cm2/s/sr/keV'
 
 #measure_cxb = True
 measure_cxb = False
@@ -69,6 +69,7 @@ energy_cut_upper = 8000
 
 on_exposure = 0.
 total_spectral_volume = 0.
+avg_fov_size = 0.
 
 #energy_array = [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
 #delta_energy = energy_array[1]-energy_array[0]
@@ -395,6 +396,8 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
     distance = 0.
     exposure = 0.
     qpb_frac = 0.
+    max_distance = 0.
+    min_distance = 1e10
     for line in cxb_file:
         if '#' in line:
             line_split = line.split(';')
@@ -405,9 +408,16 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
             line_exposure = line_split[5].strip('\n')
             exposure = float(line_exposure)
             line_coord = line_split[3]
-            line_coord = line_coord.strip('( )')
+            line_coord = line_coord.strip('( )').split(',')
             distance = pow(obs_sky_l-float(line_coord[0]),2)+pow(obs_sky_b-float(line_coord[1]),2)
             distance = pow(distance,0.5)
+            print (f'CXB sample ID = {line_obsid}')
+            print (f'CXB sample coord = {line_coord[0]} {line_coord[1]}')
+            print (f'CXB sample distance = {distance} deg')
+            if max_distance<distance:
+                max_distance = distance
+            if min_distance>distance:
+                min_distance = distance
             if not obsID=='':
                 if not obsID in line_obsid:
                     use_this_data = False
@@ -429,6 +439,8 @@ def get_cxb_spectrum(cxb_output_dir,hist_cxb,obs_sky_l,obs_sky_b,detector,obsID=
         #cxb_measurement_weight += [1./distance]
         cxb_measurement_weight += [pow(exposure,0.5)*qpb_frac]
     cxb_file.close()
+    print (f'CXB sample max distance = {max_distance} deg')
+    print (f'CXB sample min distance = {min_distance} deg')
 
     if not obsID=='':
         print (f'Load data for obsID = {obsID}, detector = {detector}')
@@ -469,6 +481,7 @@ def analyze_one_observation(obsID,detector):
     print ('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
     print (f'analyze obsID {obsID} detector {detector}')
 
+    global avg_fov_size
 
     input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
     cxb_output_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag
@@ -616,7 +629,9 @@ def analyze_one_observation(obsID,detector):
             else:
                 if mask!=1: continue
             fov_size += pow(map_rebin*detx_scale*0.05/(60.*60.),2)/3282.8 # steradian
-    print (f'fov_size = {fov_size}')
+    avg_fov_size += fov_size/len_run_list
+    print (f'fov_size = {fov_size} steradian')
+    print (f'fov_size = {fov_size*3282.8} deg2')
     pix_size = pow(detx_scale*0.05/(60.*60.),2)/3282.8
 
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[0])
@@ -642,9 +657,12 @@ def analyze_one_observation(obsID,detector):
     sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,detector,ana_ccd_bins[0])
     sci_hdu_list = fits.open(sci_filename)
     exposure = sci_hdu_list[1].header['EXPOSURE']
+    spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[aeff_r].yaxis[0]
+    spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]
     keV_to_erg = 1.60218e-9
-    spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[aeff_r].yaxis[0]*keV_to_erg
-    spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]*keV_to_erg
+    if do_energy_flux:
+        spectral_volume = ch_scale/1000.*fov_size*exposure*area_curve[aeff_r].yaxis[0]*keV_to_erg
+        spacial_volume = (energy_cut_upper-energy_cut_lower)/1000.*pix_size*exposure*area_curve[aeff_r].yaxis[0]*keV_to_erg
     print (f'area = {area_curve[aeff_r].yaxis[0]}')
     print (f'exposure = {exposure}')
     print (f'spectral_volume = {spectral_volume}')
@@ -665,6 +683,7 @@ def analyze_one_observation(obsID,detector):
         sci_hdu_list = fits.open(sci_filename)
         sci_table = Table.read(sci_filename, hdu=1)
         for entry in range(0,len(sci_table)):
+            evt_pattern = sci_table[entry]['PATTERN']
             evt_pi = sci_table[entry]['PI']
             evt_detx = sci_table[entry]['DETX']
             evt_dety = sci_table[entry]['DETY']
@@ -689,6 +708,8 @@ def analyze_one_observation(obsID,detector):
             spectrum_sci.fill(evt_pi,weight=1./spectral_volume*convert_to_energy_flux*unfolding_acceptance)
             spectrum_comb_sci.fill(evt_pi,weight=1./spectral_volume*1./len_run_list*convert_to_energy_flux*unfolding_acceptance)
             spectrum_comb_raw_sci.fill(evt_pi)
+            if evt_pattern==2 or evt_pattern==4:
+                spectrum_comb_raw_spfree.fill(evt_pi)
             image_icrs_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*convert_to_energy_flux*unfolding_acceptance)
             image_icrs_comb_sci.fill(evt_ra,evt_dec,weight=1./spacial_volume*1./len_run_list*convert_to_energy_flux*unfolding_acceptance)
             image_det_sci.fill(evt_detx,evt_dety,weight=1./spacial_volume*convert_to_energy_flux*unfolding_acceptance)
@@ -1006,35 +1027,85 @@ def main():
     image_icrs_comb_xry.add(image_icrs_comb_cxb,factor=-1.)
     common_functions.DrawSkyMap(fig,map_color,image_icrs_comb_xry,"%s/image_icrs_xry_log_job%s_%s_%s.png"%(output_dir,job,obsID,region))
 
+    on_exposure = 0.
+    for run in on_run_list:
+        obsID = run.split('_')[0]
+        input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
+        sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos1',ana_ccd_bins[0])
+        sci_hdu_list = fits.open(sci_filename)
+        on_exposure += sci_hdu_list[1].header['EXPOSURE']
+        sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos2',ana_ccd_bins[0])
+        sci_hdu_list = fits.open(sci_filename)
+        on_exposure += sci_hdu_list[1].header['EXPOSURE']
+    print (f'Total exposure = {on_exposure}')
+
+    avg_COR2FOV = 0.
+    for run in on_run_list:
+        obsID = run.split('_')[0]
+        input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
+        qpb_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,'mos1',ana_ccd_bins[0])
+        qpb_hdu_list = fits.open(qpb_filename)
+        avg_COR2FOV += qpb_hdu_list[1].header['COR2FOV']
+        qpb_filename = '%s/qpb_events_%s_ccd%s.fits'%(input_dir,'mos2',ana_ccd_bins[0])
+        qpb_hdu_list = fits.open(qpb_filename)
+        avg_COR2FOV += qpb_hdu_list[1].header['COR2FOV']
+    avg_COR2FOV = avg_COR2FOV/float(2*len(on_run_list))
+    print (f'avg_COR2FOV = {avg_COR2FOV}')
+        
     for ch in range(0,len(spectrum_comb_sci.xaxis)):
         raw_cnt = spectrum_comb_raw_sci.yaxis[ch]
+        spfree_cnt = spectrum_comb_raw_spfree.yaxis[ch]
+        qpb_cnt = spectrum_comb_raw_sci.yaxis[ch]*avg_COR2FOV
         if raw_cnt==0.: continue
         stat_err = pow(raw_cnt,0.5)
+        spfree_err = pow(spfree_cnt,0.5)
+        qpb_err = pow(qpb_cnt,0.5)
         flux = spectrum_comb_sci.yaxis[ch]
         flux_err = flux*stat_err/raw_cnt
         spectrum_comb_sci.yerr[ch] = flux_err
+        spf_flux = spectrum_comb_spf.yaxis[ch]
+        spf_flux_err = spf_flux*spfree_err/spfree_cnt
+        spectrum_comb_spf.yerr[ch] = spf_flux_err
+        qpb_flux = spectrum_comb_qpb.yaxis[ch]
+        qpb_flux_err = qpb_flux*qpb_err/qpb_cnt
+        spectrum_comb_qpb.yerr[ch] = qpb_flux_err
 
-    n_channels = float(len(spectrum_comb_sci.xaxis))
-    sum_data_flux = np.sum(spectrum_comb_sci.yaxis)
-    sum_data_flux_err = np.sum(spectrum_comb_sci.yerr)
+    n_channels = 0.
+    sum_data_flux = 0.
+    sum_data_flux_err = 0.
+    sum_cxb_flux = 0.
+    sum_cxb_flux_err = 0.
+    sum_qpb_flux = 0.
+    sum_qpb_flux_err = 0.
+    sum_spf_flux = 0.
+    sum_spf_flux_err = 0.
+    for ch in range(0,len(spectrum_comb_sci.xaxis)):
+        ch_energy = spectrum_comb_sci.xaxis[ch]
+        if ch_energy>1400. and ch_energy<2000.: continue
+        n_channels += 1.
+        sum_data_flux += spectrum_comb_sci.yaxis[ch]
+        sum_data_flux_err += spectrum_comb_sci.yerr[ch]
+        sum_cxb_flux += spectrum_comb_cxb.yaxis[ch]
+        sum_cxb_flux_err += spectrum_comb_cxb.yerr[ch]
+        sum_qpb_flux += spectrum_comb_qpb.yaxis[ch]
+        sum_qpb_flux_err += spectrum_comb_qpb.yerr[ch]
+        sum_spf_flux += spectrum_comb_spf.yaxis[ch]
+        sum_spf_flux_err += spectrum_comb_spf.yerr[ch]
     avg_data_flux = sum_data_flux/n_channels
     avg_data_flux_err = sum_data_flux_err/n_channels
     print (f'avg_data_flux = {avg_data_flux:0.2e}, avg_data_flux_err = {avg_data_flux_err:0.2e}')
-    sum_cxb_flux = np.sum(spectrum_comb_cxb.yaxis)
-    sum_cxb_flux_err = np.sum(spectrum_comb_cxb.yerr)
     avg_cxb_flux = sum_cxb_flux/n_channels
     avg_cxb_flux_err = sum_cxb_flux_err/n_channels
     print (f'avg_cxb_flux = {avg_cxb_flux:0.2e}, avg_cxb_flux_err = {avg_cxb_flux_err:0.2e}')
-    sum_qpb_flux = np.sum(spectrum_comb_qpb.yaxis)
-    sum_qpb_flux_err = np.sum(spectrum_comb_qpb.yerr)
     avg_qpb_flux = sum_qpb_flux/n_channels
     avg_qpb_flux_err = sum_qpb_flux_err/n_channels
     print (f'avg_qpb_flux = {avg_qpb_flux:0.2e}, avg_qpb_flux_err = {avg_qpb_flux_err:0.2e}')
-    sum_spf_flux = np.sum(spectrum_comb_spf.yaxis)
-    sum_spf_flux_err = np.sum(spectrum_comb_spf.yerr)
     avg_spf_flux = sum_spf_flux/n_channels
     avg_spf_flux_err = sum_spf_flux_err/n_channels
     print (f'avg_spf_flux = {avg_spf_flux:0.2e}, avg_spf_flux_err = {avg_spf_flux_err:0.2e}')
+    avg_bkg_flux = avg_cxb_flux + avg_qpb_flux + avg_spf_flux
+    avg_bkg_flux_err = pow(avg_cxb_flux_err*avg_cxb_flux_err+avg_qpb_flux_err*avg_qpb_flux_err+avg_spf_flux_err*avg_spf_flux_err,0.5)
+    print (f'avg_bkg_flux = {avg_bkg_flux:0.2e}, avg_bkg_flux_err = {avg_bkg_flux_err:0.2e}')
     
     plot_data = spectrum_comb_sci
     plot_bkg = []
@@ -1049,8 +1120,8 @@ def main():
     plot_bkg += [spectrum_comb_qpb]
     plot_color += [color_list[0]]
     plot_label += ['QPB']
-    save_name = "%s/spectrum_comb_job%s_%s_%s.png"%(output_dir,job,obsID,region)
-    save_name_ul = "%s/spectrum_comb_ul_job%s_%s_%s.png"%(output_dir,job,obsID,region)
+    save_name = "%s/spectrum_comb_%s_%s.png"%(output_dir,obsID,region)
+    save_name_ul = "%s/spectrum_comb_ul_%s_%s.png"%(output_dir,obsID,region)
     draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Energy [eV]',my_spectrum_unit,save_name,save_name_ul,show_log_spectrum)
     
     MakeRadialProjection(image_icrs_comb_sci, radial_comb_sci)
@@ -1074,9 +1145,27 @@ def main():
     plot_bkg += [radial_comb_qpb]
     plot_color += [color_list[0]]
     plot_label += ['QPB']
-    save_name = "%s/radial_comb_job%s_%s_%s.png"%(output_dir,job,obsID,region)
-    save_name_ul = "%s/radial_comb_ul_job%s_%s_%s.png"%(output_dir,job,obsID,region)
+    save_name = "%s/radial_comb_%s_%s.png"%(output_dir,obsID,region)
+    save_name_ul = "%s/radial_comb_ul_%s_%s.png"%(output_dir,obsID,region)
     draw_stacked_histogram(fig,plot_data,plot_bkg,plot_color,plot_label,'Angular distance [deg]',my_spectrum_unit,save_name,save_name_ul,True)
+
+    spectrum_comb_xry.add(spectrum_comb_sci)
+    spectrum_comb_xry.add(spectrum_comb_qpb,factor=-1.)
+    spectrum_comb_xry.add(spectrum_comb_spf,factor=-1.)
+    spectrum_comb_xry.add(spectrum_comb_cxb,factor=-1.)
+    
+    print (f'avg_fov_size = {avg_fov_size}')
+    spectrum_comb_xry.scale(avg_fov_size)
+
+    fig.clf()
+    axbig = fig.add_subplot()
+    axbig.errorbar(spectrum_comb_xry.xaxis,spectrum_comb_xry.yaxis,yerr=spectrum_comb_xry.yerr,color='k')
+    axbig.set_xlabel('Energy [eV]')
+    axbig.set_ylabel(my_spectrum_unit)
+    axbig.set_yscale('log')
+    axbig.set_xscale('log')
+    fig.savefig("%s/spectrum_comb_xry_%s_%s.png"%(output_dir,obsID,region),bbox_inches='tight')
+    axbig.remove()
     
     spectrum_comb_raw_xry.add(spectrum_comb_raw_sci)
     spectrum_comb_raw_xry.add(spectrum_comb_raw_qpb,factor=-1.)
@@ -1112,18 +1201,6 @@ def main():
     print ('write output to %s/table_upper_limit_%s_%s.fits'%(output_dir,obsID,region))
     hdul.writeto('%s/table_upper_limit_%s_%s.fits'%(output_dir,obsID,region), overwrite=True)
     
-    on_exposure = 0.
-    for run in on_run_list:
-        obsID = run.split('_')[0]
-        input_dir = '/Users/rshang/xmm_analysis/output_extended_analysis/'+on_sample+'/'+ana_tag+'/ID'+obsID
-        sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos1',ana_ccd_bins[0])
-        sci_hdu_list = fits.open(sci_filename)
-        on_exposure += sci_hdu_list[1].header['EXPOSURE']
-        sci_filename = '%s/sci_events_%s_ccd%s.fits'%(input_dir,'mos2',ana_ccd_bins[0])
-        sci_hdu_list = fits.open(sci_filename)
-        on_exposure += sci_hdu_list[1].header['EXPOSURE']
-    print (f'Total exposure = {on_exposure}')
-        
     if write_xspec_output:
     
         print (f'total_spectral_volume = {total_spectral_volume}')
@@ -1231,10 +1308,10 @@ mask_detx = -350.
 mask_dety = -350.
 
 region = 'r0'
-#mask_inner_radius = 0.0
-#mask_outer_radius = 0.015
-mask_inner_radius = 0.015
-mask_outer_radius = 0.3
+mask_inner_radius = 0.0
+mask_outer_radius = 0.015
+#mask_inner_radius = 0.015
+#mask_outer_radius = 0.3
 
 list_region = []
 list_mask_inner_radius = []
@@ -1326,6 +1403,7 @@ spectrum_comb_spf = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_uppe
 spectrum_comb_cxb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_xry = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_raw_sci = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
+spectrum_comb_raw_spfree = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_raw_qpb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_raw_spf = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
 spectrum_comb_raw_cxb = MyArray1D(bin_start=energy_cut_lower,bin_end=energy_cut_upper,pixel_scale=ch_scale)
@@ -1356,6 +1434,7 @@ for r in range(0,len(list_region)):
     spectrum_comb_cxb.reset()
     spectrum_comb_xry.reset()
     spectrum_comb_raw_sci.reset()
+    spectrum_comb_raw_spfree.reset()
     spectrum_comb_raw_qpb.reset()
     spectrum_comb_raw_spf.reset()
     spectrum_comb_raw_cxb.reset()
