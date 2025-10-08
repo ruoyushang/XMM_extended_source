@@ -1,3 +1,13 @@
+"""     
+common_functions.py
+    
+Utility functions and helper classes for XMM_extended_source.
+Provides data binning utilities, coordinate grid generation,
+statistical operations, and FITS-related array management.
+
+Author: Ruo-Yu Shang
+Affiliation: Barnard College, Columbia University
+""" 
 
 import numpy as np
 import csv
@@ -5,25 +15,31 @@ from numpy.linalg import inv
 import math
 from matplotlib import colors
 
+# Default binning and coordinate parameters used for XMM-Newton data
 pattern_low = 0
 pattern_high = 6
 pattern_scale = 1
+
 ch_low = 200
 ch_high = 12000
-#ch_scale = 50 # change energy binning here
-ch_scale = 500 # change energy binning here
+ch_scale = 500 # change energy binning here, energy binning (PI channel scale)
+
 t_low = 0
 t_high = 1
 t_scale = 0.01
+
 detx_low = -20000
 detx_high = 20000
 detx_scale = 200
+
 dety_low = -20000
 dety_high = 20000
 dety_scale = 200
+
 detr_low = 0
 detr_high = 20000
 detr_scale = 200
+
 sky_ra_low = -0.28
 sky_ra_high = 0.28
 sky_dec_low = -0.28
@@ -32,12 +48,40 @@ sky_scale = 500.*0.05/(60.*60.)
 
 
 class MyArray2D:
+    """
+    Two-dimensional array class with spatial binning support.
 
+    Attributes
+    ----------
+    xaxis : ndarray
+        X-coordinate bin centers.
+    yaxis : ndarray
+        Y-coordinate bin centers.
+    zaxis : ndarray
+        2D array of accumulated values.
+    zerr : ndarray
+        2D array of accumulated errors.
+    """
+    
     def __init__(self,start_x=-19474.5,start_y=-19474.5,image_size=39000,pixel_scale=200):
+        """
+        Initialize a 2D image grid with given spatial scale.
+
+        Parameters
+        ----------
+        start_x, start_y : float
+            Lower-left coordinates of the grid.
+        image_size : float
+            Full image size in the same units as start_x/y.
+        pixel_scale : float
+            Bin width per pixel.
+        """
+        
         nrows = int(image_size/pixel_scale)
         ncols = int(image_size/pixel_scale)
         array_shape = (nrows,ncols)
 
+        # Initialize bin centers along x and y axes
         self.xaxis = np.zeros(array_shape[0])
         self.yaxis = np.zeros(array_shape[1])
         self.zaxis = np.zeros(array_shape)
