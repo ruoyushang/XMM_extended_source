@@ -20,12 +20,12 @@ Originally developed for extended source studies in archival XMM data, the pipel
 
 ## Key Features
 
-* ✅ End-to-end pipeline for extended source analysis
-* 🧩 Modular design (each step can be run independently)
-* 📁 Multi-observation stacking and joint fitting
-* 🔬 Automated background estimation and region filtering
-* ⚙️ Integration with XSPEC and XMM-ESAS
-* 📊 Output of spectra, response files, and diagnostic plots
+* End-to-end pipeline for extended source analysis
+* Modular design (each step can be run independently)
+* Multi-observation stacking and joint fitting
+* Automated background estimation and region filtering
+* Integration with XSPEC and XMM-ESAS
+* Output of spectra, response files, and diagnostic plots
 
 ---
 
@@ -61,12 +61,6 @@ Originally developed for extended source studies in archival XMM data, the pipel
 ### Python dependencies
 
 Install required packages:
-
-```bash
-pip install -r requirements.txt
-```
-
-or manually:
 
 ```bash
 pip install numpy astropy matplotlib scipy
