@@ -1,7 +1,5 @@
 # XMM_extended_source
 
-# XMM_extended_source
-
 **Automated pipeline for detecting and analyzing extended X-ray sources in XMM-Newton observations**
 
 ---
