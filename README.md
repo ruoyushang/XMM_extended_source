@@ -226,35 +226,13 @@ python multi_observation_analysis.py --list obs_list.txt
 
 ## References
 
-* Snowden, S. L., et al. (2008), *The XMM-Newton Extended Source Analysis Software (ESAS)*, A&A, 478, 615
-* Nevalainen, J., et al. (2005), *Background modeling for extended sources in XMM-Newton*, ApJ, 620, 128
 * XMM-Newton SAS Documentation: [https://www.cosmos.esa.int/web/xmm-newton/sas](https://www.cosmos.esa.int/web/xmm-newton/sas)
 * XSPEC User Guide: [https://heasarc.gsfc.nasa.gov/xanadu/xspec/manual/](https://heasarc.gsfc.nasa.gov/xanadu/xspec/manual/)
 
 ---
 
-## Contributing
-
-Contributions and improvements are welcome! To contribute:
-
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature/your-feature`)
-3. Commit changes with clear messages
-4. Push and open a pull request
-
-Please ensure any new features are documented and tested.
-
----
-
-## License
-
-This project is licensed under the **MIT License**.
-See the [LICENSE](LICENSE) file for details.
-
----
-
 ## Acknowledgements
 
-Developed by **Ruo Shang**.
-This work was carried out at **Barnard College, Columbia University**, in collaboration with **Prof. Snow White**.
+Developed by **Ruo-Yu Shang**.
+This work was carried out at **Barnard College, Columbia University**, in collaboration with **Dr.Kaya Mori**.
 Data analysis builds upon the **XMM-Newton SAS** and **ESAS** toolkits provided by ESA.
